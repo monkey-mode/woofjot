@@ -38,7 +38,7 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
       MINIO_NOTIFY_WEBHOOK_ENABLE_BACKEND: "on"
       MINIO_NOTIFY_WEBHOOK_ENDPOINT_BACKEND: "http://backend:8000/webhook/minio"
-      MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_BACKEND: "changeme"
+      MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_BACKEND: "Bearer ${WEBHOOK_SECRET}"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -58,8 +58,7 @@ services:
       /bin/sh -c "
         mc alias set local http://minio:9000 minioadmin minioadmin &&
         mc mb --ignore-existing local/slips &&
-        mc event add local/slips arn:minio:sqs::BACKEND:webhook
-          --event s3:ObjectCreated:Put
+        mc event add local/slips arn:minio:sqs::BACKEND:webhook --event put --ignore-existing
       "
 
   backend:
