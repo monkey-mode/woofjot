@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime
+
 import asyncpg
 
 MIGRATIONS = """
@@ -81,11 +83,35 @@ async def update_image_status(
     )
 
 
+async def transition_image_to_uploaded(
+    conn: asyncpg.Connection,
+    job_id: str,
+    size_bytes: int | None = None,
+) -> bool:
+    """Update status to 'uploaded' only if currently 'pending'. Returns True if updated."""
+    result = await conn.execute(
+        """
+        UPDATE images
+        SET status = 'uploaded',
+            size_bytes = COALESCE($1, size_bytes),
+            updated_at = now()
+        WHERE job_id = $2 AND status = 'pending'
+        """,
+        size_bytes, job_id,
+    )
+    return result == "UPDATE 1"
+
+
 async def insert_expense(
     conn: asyncpg.Connection,
     image_id: int,
     result: dict,
 ) -> int:
+    raw_date = result.get("date")
+    raw_time = result.get("time")
+    date = datetime.date.fromisoformat(raw_date) if raw_date else None
+    time = datetime.time.fromisoformat(raw_time) if raw_time else None
+
     row = await conn.fetchrow(
         """
         INSERT INTO expenses (image_id, amount, currency, date, time, raw_text)
@@ -95,8 +121,8 @@ async def insert_expense(
         image_id,
         result.get("amount"),
         result.get("currency", "THB"),
-        result.get("date"),
-        result.get("time"),
+        date,
+        time,
         result.get("raw_text"),
     )
     return row["id"]

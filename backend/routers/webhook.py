@@ -26,7 +26,11 @@ async def minio_webhook(request: Request):
     job_id = key.rsplit(".", 1)[0]
 
     async with request.app.state.db.acquire() as conn:
-        await db.update_image_status(conn, job_id, "uploaded", size_bytes=size_bytes)
+        updated = await db.transition_image_to_uploaded(conn, job_id, size_bytes=size_bytes)
+
+    if not updated:
+        # Duplicate event — image already past 'pending', ignore
+        return {"ok": True}
 
     await pubsub.publish(f"scan:{job_id}", {"key": key, "job_id": job_id})
 
