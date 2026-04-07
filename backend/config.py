@@ -28,7 +28,7 @@ class Settings(BaseSettings):
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ("../.env", ".env")}
 
 
 settings = Settings()
