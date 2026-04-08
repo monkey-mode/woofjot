@@ -20,8 +20,17 @@ ONLY a JSON object with no extra text, preamble, or markdown fences:
   "currency": "THB",
   "date": <YYYY-MM-DD, convert Buddhist Era to CE>,
   "time": <HH:MM:SS or null>,
+  "category": <one of: food, transport, shopping, utilities, health, entertainment, other — infer from merchant name, description, or context; null if cannot determine>,
   "raw_text": <all visible text as a single string>
 }
+
+Category hints:
+- food: restaurants, cafes, food delivery, convenience stores, supermarkets
+- transport: fuel, BTS/MRT, taxis, Grab, tolls, parking, airlines, buses
+- shopping: clothing, electronics, department stores, online shopping
+- utilities: electricity, water, internet, phone top-up, insurance
+- health: hospitals, pharmacies, clinics, gyms
+- entertainment: cinemas, streaming, games, events
 
 If a field cannot be found, set it to null."""
 
