@@ -31,7 +31,7 @@ async def extract_slip(image_bytes: bytes, media_type: str = "image/jpeg") -> di
     b64 = base64.standard_b64encode(image_bytes).decode()
 
     message = await client.messages.create(
-        model="claude-opus-4-5",
+        model="claude-haiku-4-5-20251001",
         max_tokens=512,
         messages=[
             {
