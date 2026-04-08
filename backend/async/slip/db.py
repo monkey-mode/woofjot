@@ -46,8 +46,8 @@ async def insert_expense(
 
     row = await conn.fetchrow(
         """
-        INSERT INTO expenses (image_id, amount, currency, date, time, category, raw_text)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO expenses (image_id, amount, currency, date, time, category, sender, receiver, raw_text)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
         """,
         image_id,
@@ -56,6 +56,8 @@ async def insert_expense(
         date,
         time,
         result.get("category"),
+        result.get("from"),
+        result.get("to"),
         result.get("raw_text"),
     )
     return row["id"]

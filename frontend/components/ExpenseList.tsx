@@ -99,17 +99,24 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className={`font-semibold text-sm truncate ${cat ? "text-white" : "text-[#3D516B]"}`}>
-              {cat ? (CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat) : "ยังไม่ระบุหมวดหมู่"}
+          <p className={`font-semibold text-sm truncate ${cat ? "text-white" : "text-[#3D516B]"}`}>
+            {cat ? (CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat) : "ยังไม่ระบุหมวดหมู่"}
+          </p>
+          {(expense.sender || expense.receiver) && (
+            <p className="text-[#3D516B] text-xs truncate mt-0.5">
+              {expense.sender && <span>{expense.sender}</span>}
+              {expense.sender && expense.receiver && <span className="mx-1">→</span>}
+              {expense.receiver && <span>{expense.receiver}</span>}
+            </p>
+          )}
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-[#2A3F58] text-xs">
+              {expense.time ? expense.time.slice(0, 5) : "—"}
             </p>
             {expense.note && (
-              <p className="text-[#3D516B] text-xs truncate">{expense.note}</p>
+              <p className="text-[#3D516B] text-xs truncate">· {expense.note}</p>
             )}
           </div>
-          <p className="text-[#3D516B] text-xs mt-0.5">
-            {expense.time ? expense.time.slice(0, 5) : "—"}
-          </p>
         </div>
 
         {/* Amount + actions */}

@@ -33,6 +33,8 @@ export interface Expense {
   date: string | null;
   time: string | null;
   category: string | null;
+  sender: string | null;
+  receiver: string | null;
   note: string | null;
   created_at: string;
 }

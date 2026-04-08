@@ -14,6 +14,8 @@ class ExpenseResponse(BaseModel):
     date: date | None
     time: time | None
     category: str | None
+    sender: str | None
+    receiver: str | None
     note: str | None
     created_at: datetime
 

@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS expenses (
   date        DATE,
   time        TIME,
   category    TEXT,
+  sender      TEXT,
+  receiver    TEXT,
   note        TEXT,
   raw_text    TEXT,
   created_at  TIMESTAMPTZ DEFAULT now(),
@@ -34,6 +36,9 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE INDEX IF NOT EXISTS idx_images_job_id ON images(job_id);
 CREATE INDEX IF NOT EXISTS idx_images_status ON images(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC);
+
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS sender TEXT;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receiver TEXT;
 """
 
 
@@ -54,6 +59,8 @@ async def get_expenses(conn: asyncpg.Connection) -> list[dict]:
             e.date,
             e.time,
             e.category,
+            e.sender,
+            e.receiver,
             e.note,
             e.created_at
         FROM expenses e

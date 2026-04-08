@@ -21,6 +21,8 @@ ONLY a JSON object with no extra text, preamble, or markdown fences:
   "date": <YYYY-MM-DD, convert Buddhist Era to CE>,
   "time": <HH:MM:SS or null>,
   "category": <one of: food, transport, shopping, utilities, health, entertainment, other — infer from merchant name, description, or context; null if cannot determine>,
+  "from": <sender name or account holder name; null if not found>,
+  "to": <recipient name or merchant name; null if not found>,
   "raw_text": <all visible text as a single string>
 }
 
