@@ -100,13 +100,29 @@ services:
       timeout: 5s
       retries: 10
 
-  slip-worker:
-    build: ./backend/async/slip
+  resize-worker:
+    build: ./backend/async/resize
     env_file:
       - .env
     depends_on:
       slip-api:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./backend/async/resize:/app
+
+  slip-worker:
+    build: ./backend/async/slip
+    env_file:
+      - .env
+    depends_on:
+      resize-worker:
+        condition: service_started
       postgres:
         condition: service_healthy
       redis:
