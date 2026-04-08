@@ -31,24 +31,29 @@ export default function Home() {
   }
 
   return (
-    <main className="max-w-lg mx-auto px-4 py-8 space-y-6">
-      <div className="flex items-center gap-3">
-        <span className="text-3xl">🐶</span>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">หมาจด / WoofJot</h1>
-          <p className="text-sm text-gray-500">บันทึกค่าใช้จ่ายจากสลิปธนาคาร</p>
+    <div className="min-h-screen bg-[#F2F1EF]">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-[#F2F1EF]/80 backdrop-blur-md border-b border-black/5">
+        <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🐶</span>
+            <span className="font-bold text-gray-900 tracking-tight">WoofJot</span>
+          </div>
+          <span className="text-xs text-gray-400">บันทึกค่าใช้จ่าย</span>
         </div>
-      </div>
+      </header>
 
-      <MonthlySummary expenses={expenses} />
-
-      <SlipUploader onDone={handleDone} />
-
-      {loading ? (
-        <p className="text-center text-gray-400">กำลังโหลด...</p>
-      ) : (
-        <ExpenseList expenses={expenses} onRefresh={refresh} />
-      )}
-    </main>
+      <main className="max-w-md mx-auto px-4 pb-10 space-y-4 pt-4">
+        <MonthlySummary expenses={expenses} />
+        <SlipUploader onDone={handleDone} />
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+          </div>
+        ) : (
+          <ExpenseList expenses={expenses} onRefresh={refresh} />
+        )}
+      </main>
+    </div>
   );
 }
