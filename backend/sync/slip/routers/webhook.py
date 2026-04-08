@@ -32,6 +32,6 @@ async def minio_webhook(request: Request):
     if not updated:
         return {"ok": True}
 
-    await pubsub.publish(f"scan:{job_id}", {"key": key, "job_id": job_id})
+    await pubsub.publish(f"resize:{job_id}", {"key": key, "job_id": job_id})
 
     return {"ok": True}
