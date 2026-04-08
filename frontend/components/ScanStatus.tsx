@@ -7,6 +7,7 @@ import type { ScanResult, ScanStatus as Status } from "@/lib/types";
 const STATUS_LABEL: Record<Status, string> = {
   pending: "รอการอัปโหลด...",
   uploaded: "อัปโหลดสำเร็จ กำลังเตรียม...",
+  resizing: "กำลังปรับขนาดรูปภาพ...",
   processing: "กำลังประมวลผล...",
   done: "เสร็จสิ้น",
   failed: "เกิดข้อผิดพลาด",

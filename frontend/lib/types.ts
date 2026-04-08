@@ -5,7 +5,7 @@ export interface PresignResponse {
   expires_in: number;
 }
 
-export type ScanStatus = "pending" | "uploaded" | "processing" | "done" | "failed";
+export type ScanStatus = "pending" | "uploaded" | "resizing" | "processing" | "done" | "failed";
 
 export interface ScanResult {
   expense_id: number;
