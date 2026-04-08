@@ -11,7 +11,6 @@ logger = logging.getLogger("slip.pubsub")
 
 
 async def publish(channel: str, message: dict) -> None:
-    client = aioredis.from_url(settings.redis_url)
-    await client.publish(channel, json.dumps(message))
-    await client.aclose()
+    async with aioredis.from_url(settings.redis_url) as client:
+        await client.publish(channel, json.dumps(message))
     logger.debug("Published to %s: %s", channel, message)
