@@ -30,6 +30,6 @@ class ScanResult(BaseModel):
 
 class ScanStatusResponse(BaseModel):
     job_id: str
-    status: Literal["pending", "uploaded", "processing", "done", "failed"]
+    status: Literal["pending", "uploaded", "resizing", "processing", "done", "failed"]
     result: ScanResult | None = None
     error: str | None = None

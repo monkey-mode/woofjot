@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.post("/upload/presign", response_model=PresignResponse)
 async def presign(body: PresignRequest, request: Request):
-    ext = body.filename.rsplit(".", 1)[-1] if "." in body.filename else "jpg"
+    ext = body.filename.rsplit(".", 1)[-1].lower() if "." in body.filename else "jpg"
     job_id = uuid.uuid4().hex
     key = f"{job_id}.{ext}"
 
