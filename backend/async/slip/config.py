@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     anthropic_api_key: str
+    claude_model: str = "claude-haiku-4-5-20251001"
 
     minio_endpoint: str = "minio:9000"
     minio_access_key: str = "minioadmin"

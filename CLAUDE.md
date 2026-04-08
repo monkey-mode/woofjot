@@ -204,6 +204,9 @@ WEBHOOK_SECRET=changeme
 RESIZE_MAX_PX=1200
 RESIZE_QUALITY=85
 
+# Claude model (slip-worker)
+CLAUDE_MODEL=claude-haiku-4-5-20251001
+
 # Frontend
 NEXT_PUBLIC_SLIP_API_URL=http://localhost:8000
 NEXT_PUBLIC_EXPENSES_API_URL=http://localhost:8001
