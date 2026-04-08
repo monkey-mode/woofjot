@@ -14,6 +14,9 @@ async function request<T>(base: string, path: string, init?: RequestInit): Promi
     const text = await res.text().catch(() => res.statusText);
     throw new Error(text);
   }
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return undefined as T;
+  }
   return res.json() as Promise<T>;
 }
 
