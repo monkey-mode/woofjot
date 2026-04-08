@@ -12,64 +12,77 @@ not a rewrite.
 ```mermaid
 sequenceDiagram
     actor Frontend
-    participant Backend
-    participant Worker
+    participant SlipAPI as slip-api
+    participant ResizeWorker as resize-worker
+    participant SlipWorker as slip-worker
     participant MinIO
     participant Redis
     participant Postgres
-    participant Claude as Claude Vision API
+    participant Claude as Claude Haiku API
 
     Note over Frontend,MinIO: STEP 1 — Presign & Upload
-    Frontend->>+Backend: POST /upload/presign
-    Backend->>Postgres: INSERT images (status=pending)
-    Backend->>MinIO: Generate presigned PUT URL
-    Backend-->>-Frontend: { upload_url, job_id }
-    Frontend->>MinIO: PUT image bytes
+    Frontend->>+SlipAPI: POST /upload/presign
+    SlipAPI->>Postgres: INSERT images (status=pending)
+    SlipAPI->>MinIO: Generate presigned PUT URL
+    SlipAPI-->>-Frontend: { upload_url, job_id }
+    Frontend->>MinIO: PUT original image bytes
     MinIO-->>Frontend: 200 OK
 
-    Note over MinIO,Redis: STEP 2 — Webhook → Publish
-    MinIO->>+Backend: POST /webhook/minio (S3 event)
-    Backend->>Postgres: UPDATE images SET status=uploaded
-    Backend->>Redis: PUBLISH scan:{job_id}
-    Backend-->>-MinIO: 200 OK
+    Note over MinIO,Redis: STEP 2 — Webhook → Publish resize event
+    MinIO->>+SlipAPI: POST /webhook/minio (S3 event)
+    SlipAPI->>Postgres: UPDATE images SET status=uploaded
+    SlipAPI->>Redis: PUBLISH resize:{job_id}
+    SlipAPI-->>-MinIO: 200 OK
 
-    Note over Redis,Postgres: STEP 3 — Worker Processes Scan
-    Redis-->>Worker: pmessage scan:*
-    Worker->>Postgres: UPDATE images SET status=processing
-    Worker->>MinIO: Download image bytes
-    Worker->>+Claude: Image + extraction prompt
-    Claude-->>-Worker: { amount, currency, date, time }
-    Worker->>Postgres: INSERT expenses (image_id FK)
-    Worker->>Postgres: UPDATE images SET status=done
+    Note over Redis,MinIO: STEP 3 — Resize Worker
+    Redis-->>ResizeWorker: pmessage resize:*
+    ResizeWorker->>Postgres: UPDATE images SET status=resizing
+    ResizeWorker->>MinIO: Download original image
+    ResizeWorker->>ResizeWorker: Pillow → 1200px JPEG (q=85)
+    ResizeWorker->>MinIO: Upload {job_id}_opt.jpg
+    ResizeWorker->>Redis: PUBLISH scan:{job_id}
 
-    Note over Frontend,Backend: STEP 4 — Poll for Result
-    Frontend->>+Backend: GET /scan/{job_id}
-    Backend->>Postgres: SELECT status, expense FROM images LEFT JOIN expenses
-    Backend-->>-Frontend: { status: "processing" }
-    Frontend->>+Backend: GET /scan/{job_id}
-    Backend->>Postgres: SELECT status, expense FROM images LEFT JOIN expenses
-    Backend-->>-Frontend: { status: "done", result: {...} }
+    Note over Redis,Postgres: STEP 4 — Slip Worker Extracts
+    Redis-->>SlipWorker: pmessage scan:*
+    SlipWorker->>Postgres: UPDATE images SET status=processing
+    SlipWorker->>MinIO: Download {job_id}_opt.jpg
+    SlipWorker->>+Claude: Optimized image + extraction prompt
+    Claude-->>-SlipWorker: { amount, currency, date, time }
+    SlipWorker->>Postgres: INSERT expenses (image_id FK)
+    SlipWorker->>Postgres: UPDATE images SET status=done
+
+    Note over Frontend,SlipAPI: STEP 5 — Poll for Result
+    Frontend->>+SlipAPI: GET /scan/{job_id}
+    SlipAPI->>Postgres: SELECT status, expense FROM images LEFT JOIN expenses
+    SlipAPI-->>-Frontend: { status: "processing" }
+    Frontend->>+SlipAPI: GET /scan/{job_id}
+    SlipAPI->>Postgres: SELECT status, expense FROM images LEFT JOIN expenses
+    SlipAPI-->>-Frontend: { status: "done", result: {...} }
 ```
 
 **Key points:**
-- `images.status` in Postgres is the single source of truth for scan lifecycle
+- `images.status` is the single source of truth for scan lifecycle
 - Redis is used exclusively as an event bus (PUBLISH/SUBSCRIBE) — no state stored
-- `job_store.py` does not exist — no Redis GET/SET for job state
 - `GET /scan/{job_id}` queries Postgres directly — simple and always consistent
-- Frontend PUTs directly to MinIO — backend never handles image bytes in the request cycle
+- Frontend PUTs directly to MinIO — no service ever handles image bytes in the request cycle
+- Original image (`{job_id}.{ext}`) stored in MinIO for UI display (`images.url`)
+- Optimized image (`{job_id}_opt.jpg`) stored in MinIO for Claude — never shown in UI
+- `{job_id}_opt.jpg` key has `_opt` suffix so `job_id = key.rsplit(".", 1)[0]` → `{job_id}_opt` which matches no images row — webhook ignores it, preventing a scan loop
 - `expenses` row is only created after successful Claude extraction
 
 ## Stack
 
 ```
-Frontend      Next.js 14 (App Router) — port 3000
-Backend       FastAPI (Python 3.11) — port 8000
-Blob storage  MinIO (S3-compatible) — port 9000 / console 9001
-Event bus     Redis pub/sub — port 6379  (publish/subscribe only, no state)
-Database      PostgreSQL 16 — port 5432  (all state lives here)
-AI            Anthropic Claude Vision API (claude-opus-4-5)
-Worker        Async task inside FastAPI process (subscribes to Redis)
-Runtime       Docker Compose
+Frontend       Next.js 14 (App Router) — port 3000
+slip-api       FastAPI (Python 3.11) — port 8000  (presign, webhook, scan poll)
+expenses-api   FastAPI (Python 3.11) — port 8001  (expense CRUD)
+resize-worker  Python async — Pillow resize → MinIO → Redis scan:*
+slip-worker    Python async — Claude Haiku extraction → Postgres
+Blob storage   MinIO (S3-compatible) — port 9000 / console 9001
+Event bus      Redis pub/sub — port 6379  (publish/subscribe only, no state)
+Database       PostgreSQL 16 — port 5432  (all state lives here)
+AI             Anthropic Claude Vision API (claude-haiku-4-5-20251001)
+Runtime        Docker Compose
 ```
 
 No external services. Everything runs locally with one command.
@@ -94,20 +107,49 @@ No external services. Everything runs locally with one command.
 │   └── next.config.ts
 │
 ├── backend/
-│   ├── main.py                   # FastAPI app, lifespan, middleware
-│   ├── routers/
-│   │   ├── upload.py             # POST /upload/presign
-│   │   ├── webhook.py            # POST /webhook/minio
-│   │   ├── scan.py               # GET /scan/{job_id}
-│   │   └── expenses.py           # GET/PATCH/DELETE /expenses
-│   ├── services/
-│   │   ├── storage.py            # MinIO / S3 client (boto3)
-│   │   ├── claude.py             # Claude Vision wrapper + process_scan
-│   │   ├── pubsub.py             # Redis PUBLISH + subscriber loop
-│   │   └── db.py                 # asyncpg pool + all queries
-│   ├── models.py                 # Pydantic schemas
-│   ├── requirements.txt
-│   └── Dockerfile
+│   ├── sync/
+│   │   ├── slip/                 # slip-api — port 8000
+│   │   │   ├── routers/
+│   │   │   │   ├── upload.py     # POST /upload/presign
+│   │   │   │   ├── webhook.py    # POST /webhook/minio → PUBLISH resize:{job_id}
+│   │   │   │   └── scan.py       # GET /scan/{job_id}
+│   │   │   ├── db.py             # insert_image, transition_to_uploaded, get_scan_status
+│   │   │   ├── storage.py        # presigned PUT URL + object_url
+│   │   │   ├── pubsub.py         # publish only
+│   │   │   ├── models.py         # Pydantic schemas
+│   │   │   ├── config.py
+│   │   │   ├── main.py
+│   │   │   ├── requirements.txt
+│   │   │   └── Dockerfile
+│   │   │
+│   │   └── expenses/             # expenses-api — port 8001
+│   │       ├── db.py             # get_expenses, update_expense, delete_image_by_expense_id
+│   │       ├── models.py
+│   │       ├── config.py
+│   │       ├── main.py
+│   │       ├── requirements.txt
+│   │       └── Dockerfile
+│   │
+│   └── async/
+│       ├── resize/               # resize-worker — subscribes to resize:*
+│       │   ├── resizer.py        # Pillow download → resize → upload → PUBLISH scan:{job_id}
+│       │   ├── storage.py        # download + upload
+│       │   ├── pubsub.py         # subscribe resize:* + publish scan:*
+│       │   ├── db.py             # update_image_status
+│       │   ├── config.py
+│       │   ├── worker.py
+│       │   ├── requirements.txt
+│       │   └── Dockerfile
+│       │
+│       └── slip/                 # slip-worker — subscribes to scan:*
+│           ├── claude.py         # extract_slip + process_scan
+│           ├── storage.py        # download only
+│           ├── pubsub.py         # subscribe scan:*
+│           ├── db.py             # update_image_status, get_image_id, insert_expense
+│           ├── config.py
+│           ├── worker.py
+│           ├── requirements.txt
+│           └── Dockerfile
 │
 ├── docker-compose.yml
 ├── .env
@@ -115,7 +157,7 @@ No external services. Everything runs locally with one command.
 └── CLAUDE.md
 ```
 
-Note: `job_store.py` does not exist. There is no Redis state management.
+**Rule: no shared files across services.** Each service owns its own copy of db.py, config.py, storage.py, etc. — scoped to only what that service needs.
 
 ## Running locally
 
@@ -125,10 +167,10 @@ cp .env.example .env
 
 docker compose up --build
 
-# Frontend:       http://localhost:3000
-# Backend:        http://localhost:8000
-# API docs:       http://localhost:8000/docs
-# MinIO console:  http://localhost:9001  (minioadmin / minioadmin)
+# Frontend:            http://localhost:3000
+# slip-api docs:       http://localhost:8000/docs
+# expenses-api docs:   http://localhost:8001/docs
+# MinIO console:       http://localhost:9001  (minioadmin / minioadmin)
 ```
 
 ## Environment variables
@@ -158,113 +200,13 @@ POSTGRES_PASSWORD=woofjot
 # Webhook
 WEBHOOK_SECRET=changeme
 
-# frontend/.env.local
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
+# Resize tuning (resize-worker)
+RESIZE_MAX_PX=1200
+RESIZE_QUALITY=85
 
-## docker-compose.yml
-
-```yaml
-services:
-  postgres:
-    image: postgres:16-alpine
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: woofjot
-      POSTGRES_USER: woofjot
-      POSTGRES_PASSWORD: woofjot
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U woofjot"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_NOTIFY_WEBHOOK_ENABLE_BACKEND: "on"
-      MINIO_NOTIFY_WEBHOOK_ENDPOINT_BACKEND: "http://backend:8000/webhook/minio"
-      MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_BACKEND: "Bearer ${WEBHOOK_SECRET}"
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  minio-init:
-    image: minio/mc
-    depends_on:
-      minio:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-        mc alias set local http://minio:9000 minioadmin minioadmin &&
-        mc mb --ignore-existing local/slips &&
-        mc event add local/slips arn:minio:sqs::BACKEND:webhook --event put --ignore-existing
-      "
-
-  backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    volumes:
-      - ./backend:/app
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    depends_on:
-      - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-
-volumes:
-  postgres_data:
-  redis_data:
-  minio_data:
+# Frontend
+NEXT_PUBLIC_SLIP_API_URL=http://localhost:8000
+NEXT_PUBLIC_EXPENSES_API_URL=http://localhost:8001
 ```
 
 ## PostgreSQL schema
@@ -274,8 +216,8 @@ volumes:
 CREATE TABLE IF NOT EXISTS images (
   id              SERIAL PRIMARY KEY,
   job_id          TEXT NOT NULL UNIQUE,
-  storage_key     TEXT NOT NULL,              -- MinIO object key e.g. "abc123.jpg"
-  url             TEXT NOT NULL,              -- MinIO URL for display in UI
+  storage_key     TEXT NOT NULL,              -- MinIO key for optimized image e.g. "abc123.jpg"
+  url             TEXT NOT NULL,              -- MinIO URL of original image for UI display
   original_name   TEXT,                       -- original filename from client
   mime_type       TEXT,                       -- e.g. "image/jpeg"
   size_bytes      BIGINT,                     -- populated from webhook S3 event
@@ -288,7 +230,8 @@ CREATE TABLE IF NOT EXISTS images (
 -- status lifecycle:
 --   pending    → INSERT in /upload/presign
 --   uploaded   → UPDATE in /webhook/minio (confirmed in storage)
---   processing → UPDATE when worker starts Claude call
+--   resizing   → UPDATE when resize-worker starts
+--   processing → UPDATE when slip-worker starts Claude call
 --   done       → UPDATE after expense inserted successfully
 --   failed     → UPDATE if any step throws
 
@@ -317,10 +260,13 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC);
 - `expenses` is only inserted on `status=done` — never before
 - `ON DELETE CASCADE` means deleting an image cleans up its expense automatically
 - `size_bytes` and `mime_type` come from the MinIO S3 event — never trust the client for these
+- `images.url` points to the original image; `images.storage_key` points to the optimized image
 
 ## API endpoints
 
-### POST /upload/presign
+### slip-api (port 8000)
+
+#### POST /upload/presign
 
 Request:
 ```json
@@ -339,51 +285,39 @@ Response:
 
 - Generates `key` as `{uuid4}.{ext}` — never use original filename as key
 - `job_id` = key without extension: `key.rsplit(".", 1)[0]`
-- INSERTs `images` row with `status=pending`
+- INSERTs `images` row with `status=pending`; `url` = object_url of original key
 - Presigned URL uses `MINIO_EXTERNAL_ENDPOINT` (browser-reachable)
 
-### POST /webhook/minio
+#### POST /webhook/minio
 
-Validates bearer token, updates `images.status` to `uploaded`, publishes
-to Redis. Returns 200 immediately — never does slow work here.
+Validates bearer token, updates `images.status` to `uploaded`, publishes to `resize:{job_id}`.
+Returns 200 immediately — never does slow work here.
 
 ```python
-if request.headers.get("Authorization") != f"Bearer {settings.WEBHOOK_SECRET}":
-    raise HTTPException(403)
-
-record = payload["Records"][0]["s3"]["object"]
-key = record["key"]
 job_id = key.rsplit(".", 1)[0]
-
-async with app.state.db.acquire() as conn:
-    await db.update_image_status(
-        conn, job_id, "uploaded", size_bytes=record["size"]
-    )
-
-await pubsub.publish(f"scan:{job_id}", {"key": key, "job_id": job_id})
-return {"ok": True}
+updated = await db.transition_image_to_uploaded(conn, job_id, size_bytes=size_bytes)
+if updated:
+    await pubsub.publish(f"resize:{job_id}", {"key": key, "job_id": job_id})
 ```
 
-### GET /health
+Only publishes if status was `pending` — duplicate webhook events are silently ignored.
+
+#### GET /health
 
 ```json
 { "status": "ok" }
 ```
 
-### GET /scan/{job_id}
+#### GET /scan/{job_id}
 
 Queries Postgres directly — no Redis read.
-
-```python
-async with app.state.db.acquire() as conn:
-    row = await db.get_scan_status(conn, job_id)
-```
 
 Response shape by status:
 
 ```json
 { "job_id": "abc123", "status": "pending" }
 { "job_id": "abc123", "status": "uploaded" }
+{ "job_id": "abc123", "status": "resizing" }
 { "job_id": "abc123", "status": "processing" }
 {
   "job_id": "abc123",
@@ -401,7 +335,9 @@ Response shape by status:
 { "job_id": "abc123", "status": "failed", "error": "..." }
 ```
 
-### GET /expenses
+### expenses-api (port 8001)
+
+#### GET /expenses
 
 Returns expenses joined with images, ordered by date desc.
 
@@ -422,99 +358,57 @@ Returns expenses joined with images, ordered by date desc.
 ]
 ```
 
-### PATCH /expenses/{id}
+#### PATCH /expenses/{id}
 
 ```json
 { "category": "food", "note": "lunch with team" }
 ```
 
-### DELETE /expenses/{id}
+#### DELETE /expenses/{id}
 
 Deletes the `images` row — CASCADE removes the linked expense.
 
-## Backend: db.py queries
+## resize-worker: process_resize
+
+File: `backend/async/resize/resizer.py`
 
 ```python
-# /upload/presign
-async def insert_image(conn, job_id, storage_key, url, original_name, mime_type) -> int
+async def process_resize(key: str, job_id: str, db_pool) -> str | None:
+    # 1. Mark resizing
+    await db.update_image_status(conn, job_id, "resizing")
 
-# /webhook/minio
-async def update_image_status(conn, job_id, status, size_bytes=None, error=None) -> None
+    # 2. Download original from MinIO
+    original_bytes = await storage.download(key)
 
-# worker — after successful extraction
-async def insert_expense(conn, image_id, result: dict) -> int
+    # 3. Pillow resize → JPEG
+    optimized_bytes = _resize_bytes(original_bytes, settings.resize_max_px, settings.resize_quality)
 
-# GET /scan/{job_id} — single query with left join
-async def get_scan_status(conn, job_id) -> dict | None
+    # 4. Upload optimized to MinIO
+    optimized_key = f"{job_id}_opt.jpg"
+    await storage.upload(optimized_key, optimized_bytes, "image/jpeg")
 
-# GET /expenses
-async def get_expenses(conn) -> list[dict]
-
-# PATCH /expenses/{id}
-async def update_expense(conn, expense_id, category, note) -> None
-
-# DELETE /expenses/{id} — deletes image row, cascade handles expense
-async def delete_image_by_expense_id(conn, expense_id) -> None
+    return optimized_key  # caller publishes scan:{job_id} with this key
 ```
 
-## Backend: pubsub.py
+## slip-worker: process_scan
 
-Redis is used for pub/sub only — no GET/SET anywhere in this file.
-
-```python
-import json
-import redis.asyncio as aioredis
-from services.claude import process_scan
-
-async def publish(channel: str, message: dict) -> None:
-    client = aioredis.from_url(settings.REDIS_URL)
-    await client.publish(channel, json.dumps(message))
-    await client.aclose()
-
-async def subscribe_and_process(db_pool) -> None:
-    """Long-running coroutine. Started once in FastAPI lifespan."""
-    client = aioredis.from_url(settings.REDIS_URL)
-    pubsub = client.pubsub()
-    await pubsub.psubscribe("scan:*")
-
-    async for message in pubsub.listen():
-        if message["type"] != "pmessage":
-            continue
-        try:
-            data = json.loads(message["data"])
-            await process_scan(data["key"], data["job_id"], db_pool)
-        except Exception as e:
-            print(f"Worker error: {e}")   # log and continue — never crash the loop
-```
-
-## Backend: process_scan
-
-File: `backend/services/claude.py`
-
-All state written to Postgres only.
+File: `backend/async/slip/claude.py`
 
 ```python
 async def process_scan(key: str, job_id: str, db_pool) -> None:
-    try:
-        # 1. Mark processing
-        async with db_pool.acquire() as conn:
-            await db.update_image_status(conn, job_id, "processing")
+    # 1. Mark processing
+    await db.update_image_status(conn, job_id, "processing")
 
-        # 2. Download from MinIO
-        image_bytes = await storage.download(key)
+    # 2. Download optimized image from MinIO
+    image_bytes = await storage.download(key)  # key = {job_id}_opt.jpg
 
-        # 3. Call Claude Vision
-        result = await extract_slip(image_bytes)
+    # 3. Call Claude Haiku
+    result = await extract_slip(image_bytes, media_type)
 
-        # 4. Persist to Postgres
-        async with db_pool.acquire() as conn:
-            image = await db.get_scan_status(conn, job_id)
-            expense_id = await db.insert_expense(conn, image["image_id"], result)
-            await db.update_image_status(conn, job_id, "done")
-
-    except Exception as e:
-        async with db_pool.acquire() as conn:
-            await db.update_image_status(conn, job_id, "failed", error=str(e))
+    # 4. Persist to Postgres
+    image_id = await db.get_image_id(conn, job_id)
+    await db.insert_expense(conn, image_id, result)
+    await db.update_image_status(conn, job_id, "done")
 ```
 
 Claude extraction prompt — do not change without testing on real slips:
@@ -536,40 +430,6 @@ If a field cannot be found, set it to null.
 
 Wrap `json.loads()` in try/except. On failure call `update_image_status(..., "failed")`.
 
-## Backend: lifespan
-
-```python
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    app.state.db = await asyncpg.create_pool(dsn=settings.DATABASE_URL)
-    await db.run_migrations(app.state.db)
-
-    worker_task = asyncio.create_task(
-        pubsub.subscribe_and_process(app.state.db)
-    )
-
-    yield
-
-    worker_task.cancel()
-    await app.state.db.close()
-
-app = FastAPI(lifespan=lifespan)
-```
-
-## Backend: requirements.txt
-
-```
-fastapi==0.115.0
-uvicorn[standard]==0.30.0
-anthropic==0.34.0
-boto3==1.35.0
-asyncpg==0.29.0
-redis[asyncio]==5.0.0
-pydantic==2.8.0
-pydantic-settings==2.4.0
-python-multipart==0.0.9
-```
-
 ## Frontend: upload flow
 
 ```
@@ -580,6 +440,7 @@ python-multipart==0.0.9
 5. Show Thai status label per response status:
      pending    → "รอการอัปโหลด..."
      uploaded   → "อัปโหลดสำเร็จ กำลังเตรียม..."
+     resizing   → "กำลังปรับขนาดรูปภาพ..."
      processing → "กำลังประมวลผล..."
      done       → "เสร็จสิ้น"
      failed     → "เกิดข้อผิดพลาด"
@@ -605,6 +466,8 @@ other         อื่นๆ
 
 ## CORS
 
+Both FastAPI services apply the same CORS policy:
+
 ```python
 app.add_middleware(
     CORSMiddleware,
@@ -629,20 +492,24 @@ to convert — do not post-process dates manually.
 - Python: type hints everywhere, Pydantic v2 for all schemas, no ORM
 - TypeScript: strict mode, no `any`
 - React: functional components only
-- `ANTHROPIC_API_KEY` in backend container only — never in frontend
+- `ANTHROPIC_API_KEY` in async/slip only — never in sync services or frontend
 - Webhook handler returns 200 immediately — no slow work in the handler
 - Redis is pub/sub only — if you find yourself calling `redis.get/set`, stop
+- No shared files across services — each service is self-contained
 
 ## Docker services summary
 
-| Service    | Image              | Port        | Role                       |
-|------------|--------------------|-------------|----------------------------|
-| frontend   | custom (node:20)   | 3000        | Next.js web app            |
-| backend    | custom (py:3.11)   | 8000        | FastAPI + embedded worker  |
-| postgres   | postgres:16-alpine | 5432        | All state (images+expenses)|
-| redis      | redis:7-alpine     | 6379        | Event bus only (pub/sub)   |
-| minio      | minio/minio        | 9000 / 9001 | Blob storage + webhooks    |
-| minio-init | minio/mc           | —           | Bucket + event setup       |
+| Service      | Image              | Port        | Role                                    |
+|--------------|--------------------|-------------|-----------------------------------------|
+| frontend     | custom (node:20)   | 3000        | Next.js web app                         |
+| slip-api     | custom (py:3.11)   | 8000        | Presign, webhook, scan poll             |
+| expenses-api | custom (py:3.11)   | 8001        | Expense CRUD                            |
+| resize-worker| custom (py:3.11)   | —           | Pillow resize, publishes to scan:*      |
+| slip-worker  | custom (py:3.11)   | —           | Claude Haiku extraction                 |
+| postgres     | postgres:16-alpine | 5432        | All state (images + expenses)           |
+| redis        | redis:7-alpine     | 6379        | Event bus only (pub/sub)                |
+| minio        | minio/minio        | 9000 / 9001 | Blob storage + webhooks                 |
+| minio-init   | minio/mc           | —           | Bucket + event setup                    |
 
 ## Moving to production later
 
@@ -650,7 +517,7 @@ to convert — do not post-process dates manually.
 |---------------------------|------------------------------------------|
 | MinIO                     | AWS S3 or GCS (env var swap only)        |
 | Redis pub/sub (Docker)    | AWS ElastiCache / Upstash Redis          |
-| Asyncio worker in-process | Celery, ARQ, or AWS Lambda + SQS         |
+| Async workers (Docker)    | Celery, ARQ, or AWS Lambda + SQS         |
 | PostgreSQL (Docker)       | AWS RDS / Supabase PostgreSQL            |
 | No auth                   | Supabase Auth (LINE + Google)            |
 | HTTP webhook              | S3 Event Notifications → SNS → SQS      |
