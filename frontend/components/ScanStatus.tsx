@@ -34,18 +34,15 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
   useEffect(() => {
     const interval = setInterval(async () => {
       attempts.current += 1;
-
       if (attempts.current > 30) {
         clearInterval(interval);
         setStatus("failed");
         setError("หมดเวลา กรุณาลองใหม่");
         return;
       }
-
       try {
         const data = await getScanStatus(jobId);
         setStatus(data.status);
-
         if (data.status === "done" && data.result) {
           clearInterval(interval);
           onDone(data.result);
@@ -53,25 +50,22 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
           clearInterval(interval);
           setError(data.error ?? "เกิดข้อผิดพลาด");
         }
-      } catch {
-        // network blip — keep polling
-      }
+      } catch { /* keep polling */ }
     }, 2000);
-
     return () => clearInterval(interval);
   }, [jobId, onDone]);
 
   if (status === "failed") {
     return (
-      <div className="bg-red-50 border border-red-100 rounded-2xl p-4 space-y-3">
+      <div className="bg-[#1E0A0A] border border-red-900/40 rounded-2xl p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <span className="text-red-500 text-lg">✕</span>
-          <p className="text-red-700 font-semibold">เกิดข้อผิดพลาด</p>
+          <span className="w-6 h-6 rounded-full bg-red-900/50 flex items-center justify-center text-red-400 text-xs font-bold">✕</span>
+          <p className="text-red-400 font-semibold text-sm">เกิดข้อผิดพลาด</p>
         </div>
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {error && <p className="text-red-500/70 text-xs pl-8">{error}</p>}
         <button
           onClick={onFailed}
-          className="text-sm text-red-600 font-medium underline underline-offset-2"
+          className="ml-8 text-xs text-[#F5C518] font-semibold underline underline-offset-2"
         >
           ลองใหม่
         </button>
@@ -82,13 +76,15 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
   const currentStep = STATUS_ORDER[status] ?? 0;
 
   return (
-    <div className="bg-white rounded-2xl p-5 space-y-4 border border-gray-100">
+    <div className="bg-[#0F1E35] border border-[#1E2D45] rounded-2xl p-4 space-y-4">
+      {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin shrink-0" />
-        <p className="text-gray-700 font-semibold text-sm">กำลังประมวลผล...</p>
+        <div className="w-5 h-5 border-2 border-[#1E3455] border-t-[#F5C518] rounded-full animate-spin shrink-0" />
+        <p className="text-white font-semibold text-sm">กำลังประมวลผลสลิป...</p>
       </div>
 
-      <div className="space-y-2">
+      {/* Steps */}
+      <div className="space-y-3 pl-1">
         {STEPS.map((step, i) => {
           const stepOrder = STATUS_ORDER[step.status];
           const done = currentStep > stepOrder;
@@ -97,23 +93,33 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
           return (
             <div key={step.status} className="flex items-center gap-3">
               <div className={`
-                w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs
+                w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold
                 transition-all duration-300
-                ${done   ? "bg-gray-900 text-white" : ""}
-                ${active ? "bg-gray-200 ring-2 ring-gray-900 ring-offset-1" : ""}
-                ${!done && !active ? "bg-gray-100" : ""}
+                ${done   ? "bg-[#F5C518] text-[#0B1426]" : ""}
+                ${active ? "bg-[#1E3455] ring-2 ring-[#F5C518]/60 ring-offset-1 ring-offset-[#0F1E35]" : ""}
+                ${!done && !active ? "bg-[#1E2D45]" : ""}
               `}>
-                {done ? "✓" : <span className="text-gray-400">{i + 1}</span>}
+                {done
+                  ? <span>✓</span>
+                  : <span className={active ? "text-[#F5C518]" : "text-[#3D516B]"}>{i + 1}</span>
+                }
               </div>
-              <span className={`text-sm transition-colors duration-300 ${
-                done   ? "text-gray-900 font-medium" :
-                active ? "text-gray-900 font-semibold" :
-                         "text-gray-300"
+
+              <span className={`text-sm transition-colors duration-300 flex-1 ${
+                done   ? "text-[#8FA3BF]" :
+                active ? "text-white font-semibold" :
+                         "text-[#2A3F58]"
               }`}>
                 {step.label}
               </span>
+
               {active && (
-                <span className="ml-auto text-xs text-gray-400 animate-pulse">กำลังดำเนินการ</span>
+                <span className="text-[10px] text-[#F5C518]/60 animate-pulse font-medium">
+                  กำลังดำเนินการ
+                </span>
+              )}
+              {done && (
+                <span className="text-[10px] text-[#3D516B]">เสร็จ</span>
               )}
             </div>
           );

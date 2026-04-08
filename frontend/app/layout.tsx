@@ -6,14 +6,10 @@ export const metadata: Metadata = {
   description: "สแกนสลิปธนาคารไทยด้วย AI",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="th">
-      <body className="bg-[#F2F1EF] min-h-screen">{children}</body>
+      <body className="bg-[#0B1426] min-h-screen">{children}</body>
     </html>
   );
 }

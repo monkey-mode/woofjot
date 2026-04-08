@@ -2,104 +2,99 @@
 
 import type { Expense } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
+import DonutChart, { type DonutSegment } from "./DonutChart";
 
 interface Props {
   expenses: Expense[];
 }
 
-function currentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function formatCompact(amount: number) {
-  return new Intl.NumberFormat("th-TH", {
-    style: "currency",
-    currency: "THB",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 const CATEGORY_COLORS: Record<string, string> = {
-  food:          "bg-orange-400",
-  transport:     "bg-blue-400",
-  shopping:      "bg-pink-400",
-  utilities:     "bg-yellow-400",
-  health:        "bg-green-400",
-  entertainment: "bg-purple-400",
-  other:         "bg-gray-400",
+  food:          "#F5C518",
+  transport:     "#22D3EE",
+  shopping:      "#F472B6",
+  utilities:     "#A78BFA",
+  health:        "#4ADE80",
+  entertainment: "#FB923C",
+  other:         "#475569",
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  food:          "🍜",
+  transport:     "🚌",
+  shopping:      "🛍️",
+  utilities:     "💡",
+  health:        "❤️",
+  entertainment: "🎮",
+  other:         "📋",
 };
 
 export default function MonthlySummary({ expenses }: Props) {
-  const key = currentMonthKey();
-  const monthExpenses = expenses.filter((e) => e.date?.startsWith(key));
-  const total = monthExpenses.reduce((sum, e) => sum + (e.amount ?? 0), 0);
+  const total = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
 
-  const byCategory = monthExpenses.reduce<Record<string, number>>((acc, e) => {
+  const byCategory = expenses.reduce<Record<string, number>>((acc, e) => {
     const cat = e.category ?? "other";
     acc[cat] = (acc[cat] ?? 0) + (e.amount ?? 0);
     return acc;
   }, {});
 
-  const sorted = Object.entries(byCategory).sort(([, a], [, b]) => b - a).slice(0, 4);
+  const sorted = Object.entries(byCategory).sort(([, a], [, b]) => b - a);
 
-  const monthLabel = new Date(
-    Number(key.slice(0, 4)),
-    Number(key.slice(5, 7)) - 1
-  ).toLocaleDateString("th-TH", { year: "numeric", month: "long" });
+  const segments: DonutSegment[] = sorted.map(([cat, amount]) => ({
+    pct: amount,
+    color: CATEGORY_COLORS[cat] ?? "#475569",
+  }));
+
+  if (expenses.length === 0) return null;
 
   return (
-    <div className="bg-gray-900 text-white rounded-2xl p-5 space-y-4">
-      {/* Top row */}
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">{monthLabel}</p>
-          <p className="text-4xl font-bold mt-1 tracking-tight">
+    <div className="flex gap-4 items-center">
+      {/* Donut */}
+      <div className="relative w-28 h-28 shrink-0">
+        <DonutChart segments={segments} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <p className="text-[#F5C518] text-[10px] font-semibold uppercase tracking-wide">รายจ่าย</p>
+          <p className="text-white font-black text-sm leading-tight">
             {new Intl.NumberFormat("th-TH", {
-              style: "currency",
-              currency: "THB",
-              minimumFractionDigits: 2,
+              notation: "compact",
+              maximumFractionDigits: 1,
             }).format(total)}
           </p>
-        </div>
-        <div className="text-right">
-          <p className="text-gray-400 text-xs">รายการ</p>
-          <p className="text-2xl font-bold">{monthExpenses.length}</p>
+          <p className="text-[#3D516B] text-[10px]">บาท</p>
         </div>
       </div>
 
-      {/* Category breakdown */}
-      {sorted.length > 0 && (
-        <div className="space-y-2 pt-1">
-          {/* Stacked bar */}
-          <div className="flex h-1.5 rounded-full overflow-hidden gap-0.5">
-            {sorted.map(([cat, amount]) => (
-              <div
-                key={cat}
-                className={`${CATEGORY_COLORS[cat] ?? "bg-gray-400"} rounded-full`}
-                style={{ width: `${total > 0 ? (amount / total) * 100 : 0}%` }}
-              />
-            ))}
-          </div>
-          {/* Legend */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {sorted.map(([cat, amount]) => (
-              <div key={cat} className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${CATEGORY_COLORS[cat] ?? "bg-gray-400"}`} />
-                <span className="text-gray-300 text-xs">
-                  {CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat}
+      {/* Category list */}
+      <div className="flex-1 space-y-2 min-w-0">
+        {sorted.slice(0, 4).map(([cat, amount]) => {
+          const pct = total > 0 ? (amount / total) * 100 : 0;
+          return (
+            <div key={cat}>
+              <div className="flex items-center justify-between mb-0.5">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm">{CATEGORY_ICONS[cat] ?? "📋"}</span>
+                  <span className="text-[#8FA3BF] text-xs truncate">
+                    {CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat}
+                  </span>
+                </div>
+                <span className="text-white text-xs font-semibold ml-2 shrink-0">
+                  {new Intl.NumberFormat("th-TH", {
+                    maximumFractionDigits: 0,
+                  }).format(amount)}
                 </span>
-                <span className="text-gray-400 text-xs">{formatCompact(amount)}</span>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {monthExpenses.length === 0 && (
-        <p className="text-gray-500 text-sm">ยังไม่มีรายการเดือนนี้</p>
-      )}
+              <div className="h-1 bg-[#1E2D45] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${pct}%`,
+                    backgroundColor: CATEGORY_COLORS[cat] ?? "#475569",
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

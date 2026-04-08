@@ -7,9 +7,10 @@ import type { ScanResult } from "@/lib/types";
 
 interface Props {
   onDone: (result: ScanResult) => void;
+  onCancel?: () => void;
 }
 
-export default function SlipUploader({ onDone }: Props) {
+export default function SlipUploader({ onDone, onCancel }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -69,11 +70,11 @@ export default function SlipUploader({ onDone }: Props) {
         onDragLeave={() => setDragOver(false)}
         disabled={uploading}
         className={`
-          w-full bg-white rounded-2xl border-2 border-dashed transition-all
+          w-full bg-[#0F1E35] rounded-2xl border-2 border-dashed transition-all
           flex flex-col items-center justify-center gap-3 py-8 px-4
           ${dragOver
-            ? "border-gray-900 bg-gray-50"
-            : "border-gray-200 hover:border-gray-400 hover:bg-gray-50"
+            ? "border-[#F5C518] bg-[#F5C518]/5"
+            : "border-[#1E2D45] hover:border-[#2A3F58]"
           }
           ${uploading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
         `}
@@ -87,27 +88,36 @@ export default function SlipUploader({ onDone }: Props) {
         />
         {uploading ? (
           <>
-            <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
-            <p className="text-gray-500 text-sm font-medium">กำลังอัปโหลด...</p>
+            <div className="w-8 h-8 border-2 border-[#1E3455] border-t-[#F5C518] rounded-full animate-spin" />
+            <p className="text-[#3D516B] text-sm font-medium">กำลังอัปโหลด...</p>
           </>
         ) : (
           <>
-            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl">
+            <div className="w-14 h-14 bg-[#F5C518]/10 rounded-2xl flex items-center justify-center text-3xl">
               📄
             </div>
             <div className="text-center">
-              <p className="text-gray-800 font-semibold">อัปโหลดสลิป</p>
-              <p className="text-gray-400 text-sm mt-0.5">วางไฟล์ที่นี่ หรือแตะเพื่อเลือก</p>
-              <p className="text-gray-300 text-xs mt-1">JPG · PNG · WEBP</p>
+              <p className="text-white font-bold">อัปโหลดสลิป</p>
+              <p className="text-[#3D516B] text-sm mt-0.5">วางไฟล์ที่นี่ หรือแตะเพื่อเลือก</p>
+              <p className="text-[#2A3F58] text-xs mt-1">JPG · PNG · WEBP</p>
             </div>
           </>
         )}
       </button>
 
+      {onCancel && !uploading && (
+        <button
+          onClick={onCancel}
+          className="w-full text-center text-sm text-[#3D516B] hover:text-white py-1 transition-colors"
+        >
+          ยกเลิก
+        </button>
+      )}
+
       {error && (
-        <div className="bg-red-50 border border-red-100 rounded-xl p-3 flex items-center justify-between">
-          <p className="text-red-600 text-sm">{error}</p>
-          <button onClick={handleRetry} className="text-red-500 text-sm font-medium ml-3 shrink-0">
+        <div className="bg-red-900/20 border border-red-900/40 rounded-2xl p-3 flex items-center justify-between">
+          <p className="text-red-400 text-sm">{error}</p>
+          <button onClick={handleRetry} className="text-[#F5C518] text-sm font-semibold ml-3 shrink-0">
             ลองใหม่
           </button>
         </div>
