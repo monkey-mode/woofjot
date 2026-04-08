@@ -32,8 +32,8 @@ export default function MonthlySummary({ expenses }: Props) {
   const total = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
 
   const byCategory = expenses.reduce<Record<string, number>>((acc, e) => {
-    const cat = e.category ?? "other";
-    acc[cat] = (acc[cat] ?? 0) + (e.amount ?? 0);
+    if (!e.category) return acc;   // exclude uncategorised from breakdown
+    acc[e.category] = (acc[e.category] ?? 0) + (e.amount ?? 0);
     return acc;
   }, {});
 

@@ -63,8 +63,8 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
   const [note, setNote] = useState(expense.note ?? "");
   const [saving, setSaving] = useState(false);
 
-  const cat = expense.category ?? "other";
-  const accentColor = CATEGORY_COLORS[cat] ?? "#475569";
+  const cat = expense.category ?? null;
+  const accentColor = cat ? (CATEGORY_COLORS[cat] ?? "#475569") : "#2A3F58";
 
   async function save() {
     setSaving(true);
@@ -94,14 +94,14 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
           className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-lg"
           style={{ backgroundColor: `${accentColor}1A` }}
         >
-          {CATEGORY_ICONS[cat] ?? "📋"}
+          {cat ? (CATEGORY_ICONS[cat] ?? "📋") : "🧾"}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-white font-semibold text-sm truncate">
-              {CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat}
+            <p className={`font-semibold text-sm truncate ${cat ? "text-white" : "text-[#3D516B]"}`}>
+              {cat ? (CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat) : "ยังไม่ระบุหมวดหมู่"}
             </p>
             {expense.note && (
               <p className="text-[#3D516B] text-xs truncate">{expense.note}</p>

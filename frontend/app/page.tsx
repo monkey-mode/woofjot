@@ -51,7 +51,8 @@ export default function Home() {
   }).format(total);
 
   return (
-    <div className="min-h-screen bg-[#F5C518]">
+    <div className="min-h-screen bg-[#0B1426] flex justify-center">
+    <div className="w-full max-w-sm min-h-screen bg-[#F5C518] relative">
 
       {/* ── Yellow header ── */}
       <div className="px-5 pt-14 pb-24">
@@ -155,6 +156,7 @@ export default function Home() {
           </div>
         </div>
       </nav>
+    </div>
     </div>
   );
 }
