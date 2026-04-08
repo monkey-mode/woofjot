@@ -37,7 +37,7 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
       MINIO_NOTIFY_WEBHOOK_ENABLE_BACKEND: "on"
-      MINIO_NOTIFY_WEBHOOK_ENDPOINT_BACKEND: "http://backend:8000/webhook/minio"
+      MINIO_NOTIFY_WEBHOOK_ENDPOINT_BACKEND: "http://slip-api:8000/webhook/minio"
       MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_BACKEND: "Bearer ${WEBHOOK_SECRET}"
     volumes:
       - minio_data:/data
@@ -52,7 +52,7 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-      backend:
+      slip-api:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
@@ -62,8 +62,8 @@ services:
         mc event add local/slips arn:minio:sqs::BACKEND:webhook --event put --ignore-existing
       "
 
-  backend:
-    build: ./backend
+  slip-api:
+    build: ./backend/sync/slip
     ports:
       - "8000:8000"
     env_file:
@@ -76,21 +76,56 @@ services:
       minio:
         condition: service_healthy
     volumes:
-      - ./backend:/app
+      - ./backend/sync/slip:/app
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  expenses-api:
+    build: ./backend/sync/expenses
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/sync/expenses:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  slip-worker:
+    build: ./backend/async/slip
+    env_file:
+      - .env
+    depends_on:
+      slip-api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./backend/async/slip:/app
+
   frontend:
     build: ./frontend
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_SLIP_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_EXPENSES_API_URL=http://localhost:8001
     depends_on:
-      - backend
+      - slip-api
+      - expenses-api
     volumes:
       - ./frontend:/app
       - /app/node_modules
