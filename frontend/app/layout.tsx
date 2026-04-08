@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "WoofJot — บันทึกค่าใช้จ่าย",
   description: "สแกนสลิปธนาคารไทยด้วย AI",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

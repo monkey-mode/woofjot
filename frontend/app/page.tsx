@@ -57,7 +57,10 @@ export default function Home() {
       {/* ── Yellow header ── */}
       <div className="px-5 pt-14 pb-24">
         <div className="flex items-center justify-between mb-6">
-          <span className="font-black text-[#0B1426] text-lg tracking-tight">🐶 WoofJot</span>
+          <div className="flex items-center gap-2">
+            <img src="/icon.png" alt="" className="w-9 h-9 object-contain" />
+            <span className="font-black text-[#0B1426] text-lg tracking-tight">WoofJot</span>
+          </div>
 
           {/* Month navigation */}
           <div className="flex items-center gap-2">

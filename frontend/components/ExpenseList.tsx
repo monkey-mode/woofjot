@@ -200,7 +200,7 @@ export default function ExpenseList({ expenses, onRefresh }: Props) {
   if (expenses.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="text-5xl mb-4">🐶</div>
+        <img src="/icon.png" alt="" className="w-20 h-20 object-contain mb-2 opacity-60" />
         <p className="text-[#3D516B] font-semibold">ยังไม่มีรายการ</p>
         <p className="text-[#2A3F58] text-sm mt-1">กดปุ่ม + เพื่ออัปโหลดสลิป</p>
       </div>
