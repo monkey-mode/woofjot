@@ -56,6 +56,7 @@ export type Category =
   | "utilities"
   | "health"
   | "entertainment"
+  | "invest"
   | "other";
 
 export const CATEGORIES: Record<Category, string> = {
@@ -65,5 +66,6 @@ export const CATEGORIES: Record<Category, string> = {
   utilities: "ค่าน้ำค่าไฟ",
   health: "สุขภาพ",
   entertainment: "บันเทิง",
+  invest: "ลงทุน",
   other: "อื่นๆ",
 };
