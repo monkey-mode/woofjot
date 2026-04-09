@@ -32,6 +32,15 @@ function dayLabel(key: string): string {
   });
 }
 
+function formatDateTime(date: string | null, time: string | null): string {
+  const datePart = date
+    ? new Date(...(date.split("-").map(Number) as [number, number, number]))
+        .toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" })
+    : null;
+  const timePart = time ? time.slice(0, 5) + " น." : null;
+  return [datePart, timePart].filter(Boolean).join("  ");
+}
+
 const CATEGORY_ICONS: Record<string, string> = {
   food:          "🍜",
   transport:     "🚌",
@@ -39,6 +48,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   utilities:     "💡",
   health:        "❤️",
   entertainment: "🎮",
+  invest:        "📈",
   other:         "📋",
 };
 
@@ -49,8 +59,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   utilities:     "#A78BFA",
   health:        "#4ADE80",
   entertainment: "#FB923C",
+  invest:        "#34D399",
   other:         "#475569",
 };
+
+const INPUT_CLS = "w-full bg-[#0B1426] border border-[#2A3F58] rounded-xl px-3 py-2 text-sm text-white placeholder-[#3D516B] focus:outline-none focus:ring-2 focus:ring-[#F5C518]/50";
 
 interface RowProps {
   expense: Expense;
@@ -58,7 +71,15 @@ interface RowProps {
 }
 
 function ExpenseRow({ expense, onRefresh }: RowProps) {
+  const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
+
+  const [amount, setAmount] = useState(expense.amount != null ? String(expense.amount) : "");
+  const [date, setDate] = useState(expense.date ?? "");
+  const [time, setTime] = useState(expense.time ? expense.time.slice(0, 5) : "");
+  const [sender, setSender] = useState(expense.sender ?? "");
+  const [receiver, setReceiver] = useState(expense.receiver ?? "");
   const [category, setCategory] = useState(expense.category ?? "");
   const [note, setNote] = useState(expense.note ?? "");
   const [saving, setSaving] = useState(false);
@@ -70,8 +91,13 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
     setSaving(true);
     try {
       await updateExpense(expense.id, {
-        category: category || undefined,
-        note: note || undefined,
+        ...(amount !== "" && { amount: parseFloat(amount) }),
+        ...(date !== "" && { date }),
+        ...(time !== "" && { time: time.length === 5 ? `${time}:00` : time }),
+        ...(sender !== "" && { sender }),
+        ...(receiver !== "" && { receiver }),
+        ...(category !== "" && { category }),
+        ...(note !== "" && { note }),
       });
       setEditing(false);
       onRefresh();
@@ -86,113 +112,226 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
     onRefresh();
   }
 
+  function handleCollapse() {
+    setExpanded(false);
+    setEditing(false);
+  }
+
   return (
-    <div className="bg-[#0F1E35] rounded-2xl overflow-hidden border border-[#1E2D45]">
-      <div className="flex items-center gap-3 px-4 py-3">
-        {/* Category icon circle */}
+    <>
+      {/* Lightbox */}
+      {lightbox && expense.image_url && (
         <div
-          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-lg"
-          style={{ backgroundColor: `${accentColor}1A` }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setLightbox(false)}
         >
-          {cat ? (CATEGORY_ICONS[cat] ?? "📋") : "🧾"}
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <p className={`font-semibold text-sm truncate ${cat ? "text-white" : "text-[#3D516B]"}`}>
-            {cat ? (CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat) : "ยังไม่ระบุหมวดหมู่"}
-          </p>
-          {(expense.sender || expense.receiver) && (
-            <p className="text-[#3D516B] text-xs truncate mt-0.5">
-              {expense.sender && <span>{expense.sender}</span>}
-              {expense.sender && expense.receiver && <span className="mx-1">→</span>}
-              {expense.receiver && <span>{expense.receiver}</span>}
-            </p>
-          )}
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-[#2A3F58] text-xs">
-              {expense.time ? expense.time.slice(0, 5) : "—"}
-            </p>
-            {expense.note && (
-              <p className="text-[#3D516B] text-xs truncate">· {expense.note}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Amount + actions */}
-        <div className="text-right shrink-0">
-          <p className="font-bold text-white text-base">
-            {formatAmount(expense.amount)} <span className="text-[#3D516B] text-xs font-normal">฿</span>
-          </p>
-          <div className="flex gap-2 justify-end mt-0.5">
-            <button
-              onClick={() => setEditing(!editing)}
-              className="text-[10px] text-[#3D516B] hover:text-[#F5C518] transition-colors font-medium"
-            >
-              แก้ไข
-            </button>
-            <button
-              onClick={remove}
-              className="text-[10px] text-[#3D516B] hover:text-red-400 transition-colors font-medium"
-            >
-              ลบ
-            </button>
-          </div>
-        </div>
-
-        {/* Slip thumbnail */}
-        {expense.image_url && (
-          <a
-            href={expense.image_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 w-10 h-10 rounded-xl overflow-hidden border border-[#1E2D45]"
-          >
-            <img src={expense.image_url} alt="slip" className="w-full h-full object-cover" />
-          </a>
-        )}
-      </div>
-
-      {/* Color accent bar */}
-      <div className="h-0.5 mx-4 mb-3 rounded-full" style={{ backgroundColor: `${accentColor}40` }} />
-
-      {/* Edit panel */}
-      {editing && (
-        <div className="border-t border-[#1E2D45] px-4 py-3 space-y-2">
-          <select
-            value={category}
-            onChange={e => setCategory(e.target.value)}
-            className="w-full bg-[#1E2D45] border border-[#2A3F58] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#F5C518]/50"
-          >
-            <option value="">เลือกหมวดหมู่</option>
-            {Object.entries(CATEGORIES).map(([k, v]) => (
-              <option key={k} value={k}>{CATEGORY_ICONS[k]} {v}</option>
-            ))}
-          </select>
-          <input
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            placeholder="บันทึกย่อ..."
-            className="w-full bg-[#1E2D45] border border-[#2A3F58] rounded-xl px-3 py-2 text-sm text-white placeholder-[#3D516B] focus:outline-none focus:ring-2 focus:ring-[#F5C518]/50"
+          <img
+            src={expense.image_url}
+            alt="slip"
+            className="max-w-[90vw] max-h-[90vh] rounded-2xl shadow-2xl object-contain"
+            onClick={e => e.stopPropagation()}
           />
-          <div className="flex gap-2">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="bg-[#F5C518] text-[#0B1426] text-sm px-4 py-2 rounded-xl font-bold hover:bg-[#E6B800] disabled:opacity-50 transition-colors"
-            >
-              บันทึก
-            </button>
-            <button
-              onClick={() => setEditing(false)}
-              className="text-sm text-[#3D516B] hover:text-white px-3 transition-colors"
-            >
-              ยกเลิก
-            </button>
-          </div>
+          <button
+            onClick={() => setLightbox(false)}
+            className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+          >
+            ✕
+          </button>
         </div>
       )}
-    </div>
+
+      <div className="bg-[#0F1E35] rounded-2xl overflow-hidden border border-[#1E2D45]">
+
+        {/* ── Collapsed row (always visible, tap to expand) ── */}
+        <button
+          className="w-full flex items-center gap-3 px-4 py-3 text-left"
+          onClick={() => setExpanded(v => !v)}
+        >
+          {/* Category icon */}
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-lg"
+            style={{ backgroundColor: `${accentColor}1A` }}
+          >
+            {cat ? (CATEGORY_ICONS[cat] ?? "📋") : "🧾"}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className={`font-semibold text-sm truncate ${cat ? "text-white" : "text-[#3D516B]"}`}>
+              {cat ? (CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat) : "ยังไม่ระบุหมวดหมู่"}
+            </p>
+            {expense.note && (
+              <p className="text-[#3D516B] text-xs truncate mt-0.5">{expense.note}</p>
+            )}
+            {!expense.note && expense.receiver && (
+              <p className="text-[#3D516B] text-xs truncate mt-0.5">{expense.receiver}</p>
+            )}
+          </div>
+
+          {/* Amount + chevron */}
+          <div className="text-right shrink-0 flex items-center gap-2">
+            <div>
+              <p className="font-bold text-white text-base">
+                {formatAmount(expense.amount)}{" "}
+                <span className="text-[#3D516B] text-xs font-normal">฿</span>
+              </p>
+              <p className="text-[#2A3F58] text-[10px] text-right">
+                {expense.time ? expense.time.slice(0, 5) : ""}
+              </p>
+            </div>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              className={`w-4 h-4 text-[#2A3F58] shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+
+        {/* Accent bar */}
+        <div className="h-px mx-4" style={{ backgroundColor: `${accentColor}30` }} />
+
+        {/* ── Expanded drawer ── */}
+        {expanded && (
+          <div className="px-4 pt-4 pb-3 space-y-4">
+
+            {/* Slip info section */}
+            {!editing && (
+              <div className="space-y-3">
+                <p className="text-[#3D516B] text-[10px] font-semibold uppercase tracking-widest">
+                  ข้อมูลจากสลิป
+                </p>
+
+                {/* Sender */}
+                {expense.sender && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-[#1E2D45] flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#F5C518]">
+                        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[#3D516B] text-[10px]">จาก</p>
+                      <p className="text-white text-sm font-medium truncate">{expense.sender}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Receiver */}
+                {expense.receiver && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-[#1E2D45] flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#22D3EE]">
+                        <path d="M4 4h16v2H4zm0 6h16v2H4zm0 6h16v2H4z" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[#3D516B] text-[10px]">ถึง</p>
+                      <p className="text-white text-sm font-medium truncate">{expense.receiver}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Date/time + slip thumbnail */}
+                <div className="flex items-center justify-between">
+                  <p className="text-[#3D516B] text-xs">
+                    {formatDateTime(expense.date, expense.time)}
+                  </p>
+                  {expense.image_url && (
+                    <button
+                      onClick={() => setLightbox(true)}
+                      className="text-[#F5C518] text-xs font-medium"
+                    >
+                      แตะเพื่อดูสลิป
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Edit form */}
+            {editing && (
+              <div className="space-y-2">
+                <p className="text-[#3D516B] text-[10px] font-semibold uppercase tracking-widest">
+                  แก้ไขข้อมูล
+                </p>
+                <div className="flex gap-2">
+                  <input value={amount} onChange={e => setAmount(e.target.value)}
+                    placeholder="จำนวนเงิน" type="number" inputMode="decimal"
+                    className={INPUT_CLS + " flex-1"} />
+                  <input value={date} onChange={e => setDate(e.target.value)}
+                    type="date" className={INPUT_CLS + " flex-1"} />
+                </div>
+                <input value={time} onChange={e => setTime(e.target.value)}
+                  type="time" className={INPUT_CLS} />
+                <div className="flex gap-2">
+                  <input value={sender} onChange={e => setSender(e.target.value)}
+                    placeholder="จาก (ผู้โอน)" className={INPUT_CLS + " flex-1"} />
+                  <input value={receiver} onChange={e => setReceiver(e.target.value)}
+                    placeholder="ถึง (ผู้รับ)" className={INPUT_CLS + " flex-1"} />
+                </div>
+                <select value={category} onChange={e => setCategory(e.target.value)}
+                  className={INPUT_CLS}>
+                  <option value="">เลือกหมวดหมู่</option>
+                  {Object.entries(CATEGORIES).map(([k, v]) => (
+                    <option key={k} value={k}>{CATEGORY_ICONS[k]} {v}</option>
+                  ))}
+                </select>
+                <input value={note} onChange={e => setNote(e.target.value)}
+                  placeholder="บันทึกย่อ..." className={INPUT_CLS} />
+                <div className="flex gap-2 pt-1">
+                  <button onClick={save} disabled={saving}
+                    className="flex-1 bg-[#F5C518] text-[#0B1426] text-sm py-2 rounded-xl font-bold hover:bg-[#E6B800] disabled:opacity-50 transition-colors">
+                    บันทึก
+                  </button>
+                  <button onClick={() => setEditing(false)}
+                    className="text-sm text-[#3D516B] hover:text-white px-4 transition-colors">
+                    ยกเลิก
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            {!editing && (
+              <div className="border-t border-[#1E2D45] pt-3 flex items-center justify-between">
+                <button
+                  onClick={() => setEditing(true)}
+                  className="flex items-center gap-1.5 text-[#3D516B] hover:text-[#F5C518] text-xs font-medium transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                  </svg>
+                  แก้ไขข้อมูล
+                </button>
+                <button
+                  onClick={remove}
+                  className="flex items-center gap-1.5 text-[#3D516B] hover:text-red-400 text-xs font-medium transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                  </svg>
+                  ลบรายการนี้
+                </button>
+              </div>
+            )}
+
+            {/* Collapse button */}
+            {!editing && (
+              <button
+                onClick={handleCollapse}
+                className="w-full text-center text-[#2A3F58] text-[10px] hover:text-[#3D516B] transition-colors pt-1"
+              >
+                ▲ ย่อ
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -215,7 +354,6 @@ export default function ExpenseList({ expenses, onRefresh }: Props) {
         const dayTotal = items.reduce((s, e) => s + (e.amount ?? 0), 0);
         return (
           <div key={day}>
-            {/* Day header */}
             <div className="flex items-center justify-between px-1 mb-2">
               <p className="text-[#3D516B] text-xs font-semibold uppercase tracking-wider">
                 {dayLabel(day)}
@@ -224,7 +362,6 @@ export default function ExpenseList({ expenses, onRefresh }: Props) {
                 {new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 }).format(dayTotal)} ฿
               </p>
             </div>
-            {/* Rows */}
             <div className="space-y-2">
               {items.map(e => (
                 <ExpenseRow key={e.id} expense={e} onRefresh={onRefresh} />
