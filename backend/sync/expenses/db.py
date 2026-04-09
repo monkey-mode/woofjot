@@ -74,18 +74,18 @@ async def get_expenses(conn: asyncpg.Connection) -> list[dict]:
 async def update_expense(
     conn: asyncpg.Connection,
     expense_id: int,
-    category: str | None,
-    note: str | None,
+    update: dict,
 ) -> None:
+    fields = ["updated_at = now()"]
+    params: list = []
+    for col in ("amount", "date", "time", "sender", "receiver", "category", "note"):
+        if col in update and update[col] is not None:
+            params.append(update[col])
+            fields.append(f"{col} = ${len(params)}")
+    params.append(expense_id)
     await conn.execute(
-        """
-        UPDATE expenses
-        SET category = COALESCE($1, category),
-            note = COALESCE($2, note),
-            updated_at = now()
-        WHERE id = $3
-        """,
-        category, note, expense_id,
+        f"UPDATE expenses SET {', '.join(fields)} WHERE id = ${len(params)}",
+        *params,
     )
 
 

@@ -4,6 +4,11 @@ from datetime import date, datetime, time
 
 from pydantic import BaseModel
 
+# Aliases avoid Pydantic annotation evaluation bug where field names with
+# defaults (e.g. `date: date | None = None`) shadow the imported type.
+_Date = date
+_Time = time
+
 
 class ExpenseResponse(BaseModel):
     id: int
@@ -11,8 +16,8 @@ class ExpenseResponse(BaseModel):
     image_url: str
     amount: float | None
     currency: str
-    date: date | None
-    time: time | None
+    date: _Date | None
+    time: _Time | None
     category: str | None
     sender: str | None
     receiver: str | None
@@ -21,5 +26,10 @@ class ExpenseResponse(BaseModel):
 
 
 class ExpenseUpdate(BaseModel):
+    amount: float | None = None
+    date: _Date | None = None
+    time: _Time | None = None
+    sender: str | None = None
+    receiver: str | None = None
     category: str | None = None
     note: str | None = None

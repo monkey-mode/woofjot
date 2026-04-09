@@ -40,6 +40,11 @@ export interface Expense {
 }
 
 export interface ExpenseUpdate {
+  amount?: number;
+  date?: string;
+  time?: string;
+  sender?: string;
+  receiver?: string;
   category?: string;
   note?: string;
 }

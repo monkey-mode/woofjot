@@ -55,7 +55,7 @@ async def list_expenses(request: Request):
 @app.patch("/expenses/{expense_id}", response_model=None, status_code=204)
 async def update_expense(expense_id: int, body: ExpenseUpdate, request: Request):
     async with request.app.state.db.acquire() as conn:
-        await db.update_expense(conn, expense_id, body.category, body.note)
+        await db.update_expense(conn, expense_id, body.model_dump(exclude_unset=True))
 
 
 @app.delete("/expenses/{expense_id}", response_model=None, status_code=204)
