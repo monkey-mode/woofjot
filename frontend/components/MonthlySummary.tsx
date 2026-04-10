@@ -6,6 +6,7 @@ import DonutChart, { type DonutSegment } from "./DonutChart";
 
 interface Props {
   expenses: Expense[];
+  loading?: boolean;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -30,7 +31,23 @@ const CATEGORY_ICONS: Record<string, string> = {
   other:         "📋",
 };
 
-export default function MonthlySummary({ expenses }: Props) {
+export default function MonthlySummary({ expenses, loading }: Props) {
+  if (loading) {
+    return (
+      <div className="flex gap-4 items-center animate-pulse">
+        <div className="w-28 h-28 shrink-0 rounded-full bg-elevated" />
+        <div className="flex-1 space-y-3">
+          {[70, 50, 85, 40].map((w, i) => (
+            <div key={i} className="space-y-1">
+              <div className="h-2.5 bg-elevated rounded-full" style={{ width: `${w}%` }} />
+              <div className="h-1 bg-elevated rounded-full w-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const total = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
 
   const byCategory = expenses.reduce<Record<string, number>>((acc, e) => {
@@ -54,14 +71,14 @@ export default function MonthlySummary({ expenses }: Props) {
       <div className="relative w-28 h-28 shrink-0">
         <DonutChart segments={segments} />
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-[#F5C518] text-[10px] font-semibold uppercase tracking-wide">รายจ่าย</p>
+          <p className="text-accent text-[10px] font-semibold uppercase tracking-wide">รายจ่าย</p>
           <p className="text-white font-black text-sm leading-tight">
             {new Intl.NumberFormat("th-TH", {
               notation: "compact",
               maximumFractionDigits: 1,
             }).format(total)}
           </p>
-          <p className="text-[#3D516B] text-[10px]">บาท</p>
+          <p className="text-muted text-[10px]">บาท</p>
         </div>
       </div>
 
@@ -74,7 +91,7 @@ export default function MonthlySummary({ expenses }: Props) {
               <div className="flex items-center justify-between mb-0.5">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="text-sm">{CATEGORY_ICONS[cat] ?? "📋"}</span>
-                  <span className="text-[#8FA3BF] text-xs truncate">
+                  <span className="text-faint text-xs truncate">
                     {CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat}
                   </span>
                 </div>
@@ -84,7 +101,7 @@ export default function MonthlySummary({ expenses }: Props) {
                   }).format(amount)}
                 </span>
               </div>
-              <div className="h-1 bg-[#1E2D45] rounded-full overflow-hidden">
+              <div className="h-1 bg-elevated rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{

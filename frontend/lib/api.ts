@@ -8,7 +8,10 @@ import type {
 const SLIP_API = process.env.NEXT_PUBLIC_SLIP_API_URL ?? "http://localhost:8000";
 const EXPENSES_API = process.env.NEXT_PUBLIC_EXPENSES_API_URL ?? "http://localhost:8001";
 
+// const FAKE_DELAY_MS = 2000; // TODO: remove before ship
+
 async function request<T>(base: string, path: string, init?: RequestInit): Promise<T> {
+  // await new Promise(r => setTimeout(r, FAKE_DELAY_MS));
   const res = await fetch(`${base}${path}`, init);
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
