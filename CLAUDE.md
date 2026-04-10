@@ -52,9 +52,9 @@ sequenceDiagram
     SlipWorker->>Postgres: UPDATE images SET status=processing
     SlipWorker->>MinIO: Download {job_id}_opt.jpg
     SlipWorker->>+Claude: Optimized image + extraction prompt
-    Claude-->>-SlipWorker: { amount, currency, date, time }
+    Claude-->>-SlipWorker: { amount, currency, date, time, category, from, to } OR { not_a_slip: true }
     SlipWorker->>Postgres: INSERT expenses (image_id FK)
-    SlipWorker->>Postgres: UPDATE images SET status=done
+    SlipWorker->>Postgres: UPDATE images SET status=done (or failed)
 
     Note over Frontend,SlipAPI: STEP 5 — Poll for Result
     Frontend->>+SlipAPI: GET /scan/{job_id}
@@ -356,9 +356,16 @@ Response shape by status:
 
 ### expenses-api (port 8001)
 
-#### GET /expenses
+#### GET /expenses?month=YYYY-MM&sort=date|uploaded
 
-Returns expenses joined with images, ordered by date desc.
+Required query params:
+- `month` — calendar month to filter, e.g. `2026-04`
+- `sort` — `date` (default) or `uploaded`
+
+`sort=date`: filters by `e.date` month, orders by `e.date DESC NULLS LAST, e.created_at DESC`  
+`sort=uploaded`: filters by `e.created_at` month (UTC), orders by `e.created_at DESC`
+
+All filtering and ordering happens in SQL — the frontend receives only the rows it needs.
 
 ```json
 [
@@ -447,20 +454,27 @@ async def process_scan(key: str, job_id: str, db_pool) -> None:
     # 2. Download optimized image from MinIO
     image_bytes = await storage.download(key)  # key = {job_id}_opt.jpg
 
-    # 3. Call Claude Haiku
+    # 3. Call Claude Haiku — raises ValueError("not_a_slip") if image is not a slip
     result = await extract_slip(image_bytes, media_type)
 
     # 4. Persist to Postgres
     image_id = await db.get_image_id(conn, job_id)
     await db.insert_expense(conn, image_id, result)
     await db.update_image_status(conn, job_id, "done")
+
+    # ValueError("not_a_slip") → status=failed, error="ไม่พบสลิปธนาคารในภาพนี้"
+    # Other exceptions     → status=failed, error=str(e)
 ```
 
 Claude extraction prompt — do not change without testing on real slips:
 
 ```
-Extract the following fields from this Thai bank transfer slip and return
-ONLY a JSON object with no extra text, preamble, or markdown fences:
+Look at this image. If it is NOT a Thai bank transfer slip or payment receipt,
+return exactly this JSON with no other text:
+{"not_a_slip": true}
+
+If it IS a Thai bank transfer slip, extract the following fields and return ONLY
+a JSON object with no extra text, preamble, or markdown fences:
 
 {
   "amount": <number only, no commas or currency symbol>,
@@ -468,6 +482,8 @@ ONLY a JSON object with no extra text, preamble, or markdown fences:
   "date": <YYYY-MM-DD, convert Buddhist Era to CE>,
   "time": <HH:MM:SS or null>,
   "category": <one of: food, transport, shopping, utilities, health, entertainment, invest, other — infer from merchant name, description, or context; null if cannot determine>,
+  "from": <sender name or account holder name; null if not found>,
+  "to": <recipient name or merchant name; null if not found>,
   "raw_text": <all visible text as a single string>
 }
 
@@ -483,7 +499,7 @@ Category hints:
 If a field cannot be found, set it to null.
 ```
 
-Wrap `json.loads()` in try/except. On failure call `update_image_status(..., "failed")`.
+`extract_slip` parses the JSON. If `result.get("not_a_slip")` is true it raises `ValueError("not_a_slip")`. `process_scan` catches this sentinel and stores a Thai-language error message. All other exceptions store the raw error string.
 
 ## Frontend: upload flow
 
@@ -498,14 +514,23 @@ Wrap `json.loads()` in try/except. On failure call `update_image_status(..., "fa
      resizing   → "กำลังปรับขนาดรูปภาพ..."
      processing → "กำลังประมวลผล..."
      done       → "เสร็จสิ้น"
-     failed     → "เกิดข้อผิดพลาด"
+     failed     → show data.error verbatim (e.g. "ไม่พบสลิปธนาคารในภาพนี้")
 6. On "done"   → show result, prompt for category + note → PATCH /expenses/{id}
-7. On "failed" → show error, allow retry
+7. On "failed" → show error message, allow retry
 ```
 
 - Use raw `fetch` with `method: "PUT"` and `body: file` for MinIO upload
 - Do not use `FormData` for the PUT — presigned URLs expect raw bytes
 - Timeout polling after 30 attempts (60 seconds)
+
+## Frontend: expense list
+
+- Expenses are fetched with `GET /expenses?month=YYYY-MM&sort=date|uploaded`
+- Sort preference is persisted in `localStorage` under key `"sort"`
+- On mount, `useEffect` reads localStorage and sets `sort` state, then sets `sortReady=true`
+- The fetch is gated behind `sortReady` so exactly one request fires with the correct sort value — avoids a double-fetch when localStorage value differs from the React default
+- The sort toggle stays visually neutral (`sortReady && sort === s`) until localStorage is confirmed, preventing a flash from the default to the saved value
+- While loading, skeleton placeholders replace the header total, MonthlySummary donut, and expense rows
 
 ## Expense categories
 
@@ -552,6 +577,7 @@ to convert — do not post-process dates manually.
 - Webhook handler returns 200 immediately — no slow work in the handler
 - Redis is pub/sub only — if you find yourself calling `redis.get/set`, stop
 - No shared files across services — each service is self-contained
+- Tailwind: use semantic color tokens from `tailwind.config.ts`, never inline `[#HEX]` bracket values in class strings. Token palette: `page`, `surface`, `elevated`, `lift`, `line`, `muted`, `subtle`, `faint`, `accent`
 
 ## Docker services summary
 
