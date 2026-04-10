@@ -205,50 +205,59 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                   ข้อมูลจากสลิป
                 </p>
 
-                {/* Sender */}
-                {expense.sender && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#1E2D45] flex items-center justify-center shrink-0">
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#F5C518]">
-                        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
-                      </svg>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[#3D516B] text-[10px]">จาก</p>
-                      <p className="text-white text-sm font-medium truncate">{expense.sender}</p>
-                    </div>
-                  </div>
-                )}
+                {/* Sender / Receiver + thumbnail side-by-side */}
+                <div className="flex gap-3">
+                  <div className="flex-1 space-y-3 min-w-0">
+                    {/* Sender */}
+                    {expense.sender && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-[#1E2D45] flex items-center justify-center shrink-0">
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#F5C518]">
+                            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[#3D516B] text-[10px]">จาก</p>
+                          <p className="text-white text-sm font-medium truncate">{expense.sender}</p>
+                        </div>
+                      </div>
+                    )}
 
-                {/* Receiver */}
-                {expense.receiver && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#1E2D45] flex items-center justify-center shrink-0">
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#22D3EE]">
-                        <path d="M4 4h16v2H4zm0 6h16v2H4zm0 6h16v2H4z" />
-                      </svg>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[#3D516B] text-[10px]">ถึง</p>
-                      <p className="text-white text-sm font-medium truncate">{expense.receiver}</p>
-                    </div>
+                    {/* Receiver */}
+                    {expense.receiver && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-[#1E2D45] flex items-center justify-center shrink-0">
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#22D3EE]">
+                            <path d="M4 4h16v2H4zm0 6h16v2H4zm0 6h16v2H4z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[#3D516B] text-[10px]">ถึง</p>
+                          <p className="text-white text-sm font-medium truncate">{expense.receiver}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
 
-                {/* Date/time + slip thumbnail */}
-                <div className="flex items-center justify-between">
-                  <p className="text-[#3D516B] text-xs">
-                    {formatDateTime(expense.date, expense.time)}
-                  </p>
-                  {expense.image_url && (
+                  {/* Slip thumbnail */}
+                  {(expense.thumbnail_url ?? expense.image_url) && (
                     <button
                       onClick={() => setLightbox(true)}
-                      className="text-[#F5C518] text-xs font-medium"
+                      className="shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-[#2A3F58] self-start"
                     >
-                      แตะเพื่อดูสลิป
+                      <img
+                        src={(expense.thumbnail_url ?? expense.image_url)!}
+                        alt="slip"
+                        className="w-full h-full object-cover"
+                      />
                     </button>
                   )}
                 </div>
+
+                {/* Date/time */}
+                <p className="text-[#3D516B] text-xs">
+                  {formatDateTime(expense.date, expense.time)}
+                </p>
               </div>
             )}
 

@@ -28,6 +28,7 @@ export interface Expense {
   id: number;
   image_id: number;
   image_url: string;
+  thumbnail_url: string | null;
   amount: number | null;
   currency: string;
   date: string | null;
