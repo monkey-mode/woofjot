@@ -34,12 +34,17 @@ sequenceDiagram
     SlipAPI->>Redis: PUBLISH resize:{job_id}
     SlipAPI-->>-MinIO: 200 OK
 
-    Note over Redis,MinIO: STEP 3 — Resize Worker
+    Note over Redis,MinIO: STEP 3 — Resize Worker (3 images)
     Redis-->>ResizeWorker: pmessage resize:*
     ResizeWorker->>Postgres: UPDATE images SET status=resizing
     ResizeWorker->>MinIO: Download original image
-    ResizeWorker->>ResizeWorker: Pillow → 1200px JPEG (q=85)
+    ResizeWorker->>ResizeWorker: Pillow → 2400px JPEG (q=88) — storage copy
+    ResizeWorker->>MinIO: Upload {job_id}_store.jpg
+    ResizeWorker->>ResizeWorker: Pillow → 1200px JPEG (q=85) — LLM copy
     ResizeWorker->>MinIO: Upload {job_id}_opt.jpg
+    ResizeWorker->>ResizeWorker: Pillow → 400px JPEG (q=75) — thumbnail
+    ResizeWorker->>MinIO: Upload {job_id}_thumb.jpg
+    ResizeWorker->>Postgres: UPDATE images SET url=store_url, thumbnail_url=thumb_url
     ResizeWorker->>Redis: PUBLISH scan:{job_id}
 
     Note over Redis,Postgres: STEP 4 — Slip Worker Extracts
@@ -65,9 +70,12 @@ sequenceDiagram
 - Redis is used exclusively as an event bus (PUBLISH/SUBSCRIBE) — no state stored
 - `GET /scan/{job_id}` queries Postgres directly — simple and always consistent
 - Frontend PUTs directly to MinIO — no service ever handles image bytes in the request cycle
-- Original image (`{job_id}.{ext}`) stored in MinIO for UI display (`images.url`)
-- Optimized image (`{job_id}_opt.jpg`) stored in MinIO for Claude — never shown in UI
-- `{job_id}_opt.jpg` key has `_opt` suffix so `job_id = key.rsplit(".", 1)[0]` → `{job_id}_opt` which matches no images row — webhook ignores it, preventing a scan loop
+- Three MinIO objects are created per upload:
+  - `{job_id}.{ext}` — raw upload (only used until resize completes, then superseded)
+  - `{job_id}_store.jpg` — high-quality storage copy (2400px, q=88); `images.url` is updated to this after resize
+  - `{job_id}_opt.jpg` — LLM-optimized copy (1200px, q=85); sent to Claude, never shown in UI
+  - `{job_id}_thumb.jpg` — thumbnail (400px, q=75); stored in `images.thumbnail_url`, shown in UI
+- `_store`, `_opt`, `_thumb` suffixes ensure `key.rsplit(".", 1)[0]` never matches an `images` row — webhook ignores them, preventing a resize/scan loop
 - `expenses` row is only created after successful Claude extraction
 
 ## Stack
@@ -132,10 +140,10 @@ No external services. Everything runs locally with one command.
 │   │
 │   └── async/
 │       ├── resize/               # resize-worker — subscribes to resize:*
-│       │   ├── resizer.py        # Pillow download → resize → upload → PUBLISH scan:{job_id}
-│       │   ├── storage.py        # download + upload
+│       │   ├── resizer.py        # Pillow → 3 images (_store, _opt, _thumb) → PUBLISH scan:{job_id}
+│       │   ├── storage.py        # download + upload + object_url
 │       │   ├── pubsub.py         # subscribe resize:* + publish scan:*
-│       │   ├── db.py             # update_image_status
+│       │   ├── db.py             # update_image_status, update_image_urls
 │       │   ├── config.py
 │       │   ├── worker.py
 │       │   ├── requirements.txt
@@ -201,8 +209,12 @@ POSTGRES_PASSWORD=woofjot
 WEBHOOK_SECRET=changeme
 
 # Resize tuning (resize-worker)
-RESIZE_MAX_PX=1200
-RESIZE_QUALITY=85
+RESIZE_MAX_PX=1200          # LLM-optimised copy max dimension
+RESIZE_QUALITY=85           # LLM-optimised copy JPEG quality
+RESIZE_STORE_MAX_PX=2400    # Storage-optimised original max dimension
+RESIZE_STORE_QUALITY=88     # Storage-optimised original JPEG quality
+RESIZE_THUMB_MAX_PX=400     # Thumbnail max dimension
+RESIZE_THUMB_QUALITY=75     # Thumbnail JPEG quality
 
 # Claude model (slip-worker)
 CLAUDE_MODEL=claude-haiku-4-5-20251001
@@ -219,8 +231,9 @@ NEXT_PUBLIC_EXPENSES_API_URL=http://localhost:8001
 CREATE TABLE IF NOT EXISTS images (
   id              SERIAL PRIMARY KEY,
   job_id          TEXT NOT NULL UNIQUE,
-  storage_key     TEXT NOT NULL,              -- MinIO key for optimized image e.g. "abc123.jpg"
-  url             TEXT NOT NULL,              -- MinIO URL of original image for UI display
+  storage_key     TEXT NOT NULL,              -- MinIO key of the LLM-optimised copy e.g. "abc123_opt.jpg"
+  url             TEXT NOT NULL,              -- MinIO URL of storage copy (_store.jpg) — updated by resize-worker
+  thumbnail_url   TEXT,                       -- MinIO URL of thumbnail (_thumb.jpg) — populated by resize-worker
   original_name   TEXT,                       -- original filename from client
   mime_type       TEXT,                       -- e.g. "image/jpeg"
   size_bytes      BIGINT,                     -- populated from webhook S3 event
@@ -263,7 +276,9 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC);
 - `expenses` is only inserted on `status=done` — never before
 - `ON DELETE CASCADE` means deleting an image cleans up its expense automatically
 - `size_bytes` and `mime_type` come from the MinIO S3 event — never trust the client for these
-- `images.url` points to the original image; `images.storage_key` points to the optimized image
+- `images.url` initially points to the raw upload; resize-worker updates it to `_store.jpg` (high-quality compressed)
+- `images.thumbnail_url` is `null` until resize-worker populates it with the `_thumb.jpg` URL
+- `images.storage_key` points to the LLM-optimised copy (`_opt.jpg`) used for Claude extraction
 
 ## API endpoints
 
@@ -328,7 +343,8 @@ Response shape by status:
   "result": {
     "expense_id": 1,
     "image_id": 1,
-    "image_url": "http://localhost:9000/slips/abc123.jpg",
+    "image_url": "http://localhost:9000/slips/abc123_store.jpg",
+    "thumbnail_url": "http://localhost:9000/slips/abc123_thumb.jpg",
     "amount": 1500.00,
     "currency": "THB",
     "date": "2026-03-29",
@@ -349,12 +365,15 @@ Returns expenses joined with images, ordered by date desc.
   {
     "id": 1,
     "image_id": 1,
-    "image_url": "http://localhost:9000/slips/abc123.jpg",
+    "image_url": "http://localhost:9000/slips/abc123_store.jpg",
+    "thumbnail_url": "http://localhost:9000/slips/abc123_thumb.jpg",
     "amount": 1500.00,
     "currency": "THB",
     "date": "2026-03-29",
     "time": "14:32:00",
     "category": "food",
+    "sender": "Somchai K.",
+    "receiver": "Coffee Shop Co., Ltd.",
     "note": "lunch",
     "created_at": "2026-03-29T14:32:00Z"
   }
@@ -363,8 +382,18 @@ Returns expenses joined with images, ordered by date desc.
 
 #### PATCH /expenses/{id}
 
+All fields are optional. Only provided fields are updated.
+
 ```json
-{ "category": "food", "note": "lunch with team" }
+{
+  "amount": 1500.00,
+  "date": "2026-03-29",
+  "time": "14:32:00",
+  "sender": "Somchai K.",
+  "receiver": "Coffee Shop Co., Ltd.",
+  "category": "food",
+  "note": "lunch with team"
+}
 ```
 
 #### DELETE /expenses/{id}
@@ -383,14 +412,27 @@ async def process_resize(key: str, job_id: str, db_pool) -> str | None:
     # 2. Download original from MinIO
     original_bytes = await storage.download(key)
 
-    # 3. Pillow resize → JPEG
-    optimized_bytes = _resize_bytes(original_bytes, settings.resize_max_px, settings.resize_quality)
+    # 3. Storage-optimised copy → {job_id}_store.jpg (2400px, q=88)
+    store_bytes = _resize_bytes(original_bytes, settings.resize_store_max_px, settings.resize_store_quality)
+    store_key = f"{job_id}_store.jpg"
+    await storage.upload(store_key, store_bytes, "image/jpeg")
+    store_url = storage.object_url(store_key)
 
-    # 4. Upload optimized to MinIO
-    optimized_key = f"{job_id}_opt.jpg"
-    await storage.upload(optimized_key, optimized_bytes, "image/jpeg")
+    # 4. LLM-optimised copy → {job_id}_opt.jpg (1200px, q=85)
+    opt_bytes = _resize_bytes(original_bytes, settings.resize_max_px, settings.resize_quality)
+    opt_key = f"{job_id}_opt.jpg"
+    await storage.upload(opt_key, opt_bytes, "image/jpeg")
 
-    return optimized_key  # caller publishes scan:{job_id} with this key
+    # 5. Thumbnail → {job_id}_thumb.jpg (400px, q=75)
+    thumb_bytes = _resize_bytes(original_bytes, settings.resize_thumb_max_px, settings.resize_thumb_quality)
+    thumb_key = f"{job_id}_thumb.jpg"
+    await storage.upload(thumb_key, thumb_bytes, "image/jpeg")
+    thumb_url = storage.object_url(thumb_key)
+
+    # 6. Update images.url → store URL, images.thumbnail_url → thumb URL
+    await db.update_image_urls(conn, job_id, url=store_url, thumbnail_url=thumb_url)
+
+    return opt_key  # caller publishes scan:{job_id} with this key
 ```
 
 ## slip-worker: process_scan

@@ -8,7 +8,7 @@ Scan Thai bank transfer slips and automatically extract amount, date, time, cate
 
 - Upload a Thai bank slip (KBank, SCB, KTB, BBL, TTB, PromptPay)
 - Claude Vision extracts amount, date, time, category, sender, and receiver automatically
-- Image is auto-resized before sending to Claude to reduce API cost
+- Each upload produces 3 images: storage copy (2400px), LLM copy (1200px for Claude), thumbnail (400px for fast UI)
 - Tap any expense to expand — view slip details, edit extracted data, or delete
 - Tap the slip thumbnail to view the original image in a lightbox
 - Monthly view with category donut chart and per-category breakdown
@@ -58,12 +58,17 @@ sequenceDiagram
     SlipAPI->>Redis: PUBLISH resize:{job_id}
     SlipAPI-->>-MinIO: 200 OK
 
-    Note over Redis,MinIO: STEP 3 — Resize Worker
+    Note over Redis,MinIO: STEP 3 — Resize Worker (3 images)
     Redis-->>ResizeWorker: pmessage resize:*
     ResizeWorker->>Postgres: UPDATE images SET status=resizing
     ResizeWorker->>MinIO: Download original image
-    ResizeWorker->>ResizeWorker: Pillow → 1200px JPEG (q=85)
+    ResizeWorker->>ResizeWorker: Pillow → 2400px JPEG (q=88) — storage copy
+    ResizeWorker->>MinIO: Upload {job_id}_store.jpg
+    ResizeWorker->>ResizeWorker: Pillow → 1200px JPEG (q=85) — LLM copy
     ResizeWorker->>MinIO: Upload {job_id}_opt.jpg
+    ResizeWorker->>ResizeWorker: Pillow → 400px JPEG (q=75) — thumbnail
+    ResizeWorker->>MinIO: Upload {job_id}_thumb.jpg
+    ResizeWorker->>Postgres: UPDATE images SET url=store_url, thumbnail_url=thumb_url
     ResizeWorker->>Redis: PUBLISH scan:{job_id}
 
     Note over Redis,Postgres: STEP 4 — Slip Worker Extracts
@@ -81,7 +86,7 @@ sequenceDiagram
     SlipAPI-->>-Frontend: { status: "done", result: {...} }
 ```
 
-The frontend uploads the original image directly to MinIO via a presigned URL. MinIO fires a webhook to slip-api, which publishes a resize event to Redis. The resize-worker downloads the original, produces a 1200px JPEG, and publishes to the scan channel. The slip-worker downloads the optimized image, calls Claude Haiku with the extraction prompt, and writes the result to Postgres. The frontend polls until done. The original image is preserved in MinIO for display in the UI.
+The frontend uploads the original image directly to MinIO via a presigned URL. MinIO fires a webhook to slip-api, which publishes a resize event to Redis. The resize-worker downloads the original and produces three images: a high-quality storage copy (`_store.jpg`, 2400px), an LLM-optimized copy (`_opt.jpg`, 1200px), and a thumbnail (`_thumb.jpg`, 400px). It updates `images.url` and `images.thumbnail_url` in Postgres, then publishes to the scan channel. The slip-worker downloads the optimized copy, calls Claude Haiku with the extraction prompt, and writes the result to Postgres. The frontend polls until done and displays the thumbnail in the expense list.
 
 ## Quick start
 
@@ -112,8 +117,12 @@ Key variables in `.env` (see `.env.example` for full list):
 |---|---|
 | `ANTHROPIC_API_KEY` | Required. Your Anthropic API key. |
 | `CLAUDE_MODEL` | Claude model ID. Default: `claude-haiku-4-5-20251001` |
-| `RESIZE_MAX_PX` | Max image dimension before Claude call. Default: `1200` |
-| `RESIZE_QUALITY` | JPEG quality for resized image. Default: `85` |
+| `RESIZE_MAX_PX` | LLM-optimised copy max dimension. Default: `1200` |
+| `RESIZE_QUALITY` | LLM-optimised copy JPEG quality. Default: `85` |
+| `RESIZE_STORE_MAX_PX` | Storage copy max dimension. Default: `2400` |
+| `RESIZE_STORE_QUALITY` | Storage copy JPEG quality. Default: `88` |
+| `RESIZE_THUMB_MAX_PX` | Thumbnail max dimension. Default: `400` |
+| `RESIZE_THUMB_QUALITY` | Thumbnail JPEG quality. Default: `75` |
 | `MINIO_EXTERNAL_ENDPOINT` | MinIO endpoint reachable by the browser. Default: `localhost:9000` |
 
 ## API
@@ -225,8 +234,8 @@ Dates in Buddhist Era (e.g. พ.ศ. 2568) are automatically converted to CE.
 - **No shared files across services.** Each service owns its own `db.py`, `config.py`, `storage.py` scoped to only what it needs.
 - **Redis is pub/sub only.** No `GET`/`SET` — all state lives in Postgres.
 - **Single source of truth.** `images.status` drives the entire scan lifecycle.
-- **Image is resized before Claude.** Reduces token cost without sacrificing extraction accuracy.
-- **Original image preserved.** The browser always shows the original; only the optimized copy is sent to Claude.
+- **Three images per upload.** `_store.jpg` (2400px) for high-quality display, `_opt.jpg` (1200px) for Claude to reduce token cost, `_thumb.jpg` (400px) for fast thumbnail rendering in the expense list.
+- **`images.url` updated after resize.** Initially points to the raw upload; resize-worker overwrites it with the storage copy URL so the UI always shows the compressed-but-high-quality version.
 
 ## License
 
