@@ -12,8 +12,12 @@ import storage
 
 logger = logging.getLogger("slip.worker.claude")
 
-_PROMPT = """Extract the following fields from this Thai bank transfer slip and return \
-ONLY a JSON object with no extra text, preamble, or markdown fences:
+_PROMPT = """Look at this image. If it is NOT a Thai bank transfer slip or payment receipt, \
+return exactly this JSON with no other text:
+{"not_a_slip": true}
+
+If it IS a Thai bank transfer slip, extract the following fields and return ONLY a JSON \
+object with no extra text, preamble, or markdown fences:
 
 {
   "amount": <number only, no commas or currency symbol>,
@@ -72,7 +76,10 @@ async def extract_slip(image_bytes: bytes, media_type: str = "image/jpeg") -> di
         raw = raw.strip()
     if not raw:
         raise ValueError("Claude returned an empty response")
-    return json.loads(raw)
+    result = json.loads(raw)
+    if result.get("not_a_slip"):
+        raise ValueError("not_a_slip")
+    return result
 
 
 async def process_scan(key: str, job_id: str, db_pool) -> None:
@@ -107,6 +114,15 @@ async def process_scan(key: str, job_id: str, db_pool) -> None:
 
         logger.info("Scan done [%s]", job_id)
 
+    except ValueError as e:
+        if str(e) == "not_a_slip":
+            logger.warning("Not a slip [%s]", job_id)
+            async with db_pool.acquire() as conn:
+                await db.update_image_status(conn, job_id, "failed", error="ไม่พบสลิปธนาคารในภาพนี้")
+        else:
+            logger.error("Scan failed [%s]: %s", job_id, e, exc_info=True)
+            async with db_pool.acquire() as conn:
+                await db.update_image_status(conn, job_id, "failed", error=str(e))
     except Exception as e:
         logger.error("Scan failed [%s]: %s", job_id, e, exc_info=True)
         async with db_pool.acquire() as conn:
