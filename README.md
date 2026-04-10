@@ -8,11 +8,14 @@ Scan Thai bank transfer slips and automatically extract amount, date, time, cate
 
 - Upload a Thai bank slip (KBank, SCB, KTB, BBL, TTB, PromptPay)
 - Claude Vision extracts amount, date, time, category, sender, and receiver automatically
+- Non-slip images (photos, screenshots, etc.) are detected and rejected with a clear error
 - Each upload produces 3 images: storage copy (2400px), LLM copy (1200px for Claude), thumbnail (400px for fast UI)
 - Tap any expense to expand — view slip details, edit extracted data, or delete
-- Tap the slip thumbnail to view the original image in a lightbox
+- Tap the slip thumbnail to view the full image inline
 - Monthly view with category donut chart and per-category breakdown
 - Navigate between months with the month selector
+- Sort expenses by slip date or upload date — preference persisted across sessions
+- Skeleton loading states for header totals, category summary, and expense list
 
 ## Stack
 
@@ -140,10 +143,12 @@ Key variables in `.env` (see `.env.example` for full list):
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/expenses` | List all expenses (joined with image URL) |
+| `GET` | `/expenses?month=YYYY-MM&sort=date\|uploaded` | List expenses for a month, ordered by slip date or upload date |
 | `PATCH` | `/expenses/{id}` | Update any extracted field or category/note |
 | `DELETE` | `/expenses/{id}` | Delete expense and original slip image |
 | `GET` | `/health` | Health check |
+
+`sort=date` (default) filters and orders by the slip date extracted from the image. `sort=uploaded` filters and orders by the upload timestamp (`created_at`). All filtering happens in SQL — no client-side processing.
 
 ### PATCH /expenses/{id} body
 
@@ -236,6 +241,8 @@ Dates in Buddhist Era (e.g. พ.ศ. 2568) are automatically converted to CE.
 - **Single source of truth.** `images.status` drives the entire scan lifecycle.
 - **Three images per upload.** `_store.jpg` (2400px) for high-quality display, `_opt.jpg` (1200px) for Claude to reduce token cost, `_thumb.jpg` (400px) for fast thumbnail rendering in the expense list.
 - **`images.url` updated after resize.** Initially points to the raw upload; resize-worker overwrites it with the storage copy URL so the UI always shows the compressed-but-high-quality version.
+- **Non-slip detection in the prompt.** Claude is instructed to return `{"not_a_slip": true}` when the image is not a bank transfer slip. The worker detects this sentinel and stores a Thai-language error message (`ไม่พบสลิปธนาคารในภาพนี้`) rather than a raw exception string.
+- **Month filtering and sort in SQL.** `GET /expenses` accepts `?month=YYYY-MM&sort=date|uploaded`. All filtering and ordering happens in a single SQL query — the frontend receives only the rows it needs.
 
 ## License
 
