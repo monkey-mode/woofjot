@@ -22,6 +22,7 @@ async def get_scan(job_id: str, request: Request):
             expense_id=row["expense_id"],
             image_id=row["image_id"],
             image_url=row["image_url"],
+            thumbnail_url=row["thumbnail_url"],
             amount=row["amount"],
             currency=row["currency"] or "THB",
             date=row["date"],

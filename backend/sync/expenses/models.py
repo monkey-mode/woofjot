@@ -14,6 +14,7 @@ class ExpenseResponse(BaseModel):
     id: int
     image_id: int
     image_url: str
+    thumbnail_url: str | None
     amount: float | None
     currency: str
     date: _Date | None

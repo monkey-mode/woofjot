@@ -40,6 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC);
 -- idempotent column additions for existing databases
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS sender TEXT;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receiver TEXT;
+ALTER TABLE images  ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
 """
 
 
@@ -93,12 +94,13 @@ async def get_scan_status(
     row = await conn.fetchrow(
         """
         SELECT
-            i.id AS image_id,
+            i.id            AS image_id,
             i.job_id,
-            i.url AS image_url,
+            i.url           AS image_url,
+            i.thumbnail_url AS thumbnail_url,
             i.status,
             i.error,
-            e.id AS expense_id,
+            e.id            AS expense_id,
             e.amount,
             e.currency,
             e.date,

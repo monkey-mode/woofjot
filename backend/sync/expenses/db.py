@@ -39,6 +39,7 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC);
 
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS sender TEXT;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receiver TEXT;
+ALTER TABLE images  ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
 """
 
 
@@ -53,7 +54,8 @@ async def get_expenses(conn: asyncpg.Connection) -> list[dict]:
         SELECT
             e.id,
             e.image_id,
-            i.url AS image_url,
+            i.url           AS image_url,
+            i.thumbnail_url AS thumbnail_url,
             e.amount,
             e.currency,
             e.date,
