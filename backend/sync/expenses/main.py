@@ -46,9 +46,11 @@ async def health():
 
 
 @app.get("/expenses", response_model=list[ExpenseResponse])
-async def list_expenses(request: Request):
+async def list_expenses(request: Request, month: str, sort: str = "date"):
+    if sort not in ("date", "uploaded"):
+        sort = "date"
     async with request.app.state.db.acquire() as conn:
-        rows = await db.get_expenses(conn)
+        rows = await db.get_expenses(conn, month=month, sort=sort)
     return [ExpenseResponse(**r) for r in rows]
 
 

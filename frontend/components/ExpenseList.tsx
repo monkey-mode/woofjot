@@ -8,6 +8,7 @@ import { CATEGORIES } from "@/lib/types";
 interface Props {
   expenses: Expense[];
   onRefresh: () => void;
+  sort?: "date" | "uploaded";
 }
 
 function formatAmount(amount: number | null) {
@@ -15,10 +16,12 @@ function formatAmount(amount: number | null) {
   return new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2 }).format(amount);
 }
 
-function groupByDay(expenses: Expense[]): Record<string, Expense[]> {
+function groupByDay(expenses: Expense[], sort: "date" | "uploaded"): Record<string, Expense[]> {
   const groups: Record<string, Expense[]> = {};
   for (const e of expenses) {
-    const key = e.date ?? "ไม่ทราบวันที่";
+    const key = sort === "uploaded"
+      ? e.created_at.slice(0, 10)
+      : (e.date ?? "ไม่ทราบวันที่");
     (groups[key] ??= []).push(e);
   }
   return groups;
@@ -344,7 +347,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
   );
 }
 
-export default function ExpenseList({ expenses, onRefresh }: Props) {
+export default function ExpenseList({ expenses, onRefresh, sort = "date" }: Props) {
   if (expenses.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -355,7 +358,7 @@ export default function ExpenseList({ expenses, onRefresh }: Props) {
     );
   }
 
-  const groups = groupByDay(expenses);
+  const groups = groupByDay(expenses, sort);
 
   return (
     <div className="space-y-5 mt-2">

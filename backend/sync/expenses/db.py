@@ -48,9 +48,25 @@ async def run_migrations(pool: asyncpg.Pool) -> None:
         await conn.execute(_MIGRATIONS)
 
 
-async def get_expenses(conn: asyncpg.Connection) -> list[dict]:
+async def get_expenses(
+    conn: asyncpg.Connection,
+    month: str,
+    sort: str = "date",
+) -> list[dict]:
+    """Return expenses for the given YYYY-MM month.
+
+    When sort='date'     → filter & order by slip date (e.date).
+    When sort='uploaded' → filter & order by upload time (e.created_at).
+    """
+    if sort == "uploaded":
+        where = "TO_CHAR(e.created_at AT TIME ZONE 'UTC', 'YYYY-MM') = $1"
+        order = "e.created_at DESC"
+    else:
+        where = "TO_CHAR(e.date, 'YYYY-MM') = $1"
+        order = "e.date DESC NULLS LAST, e.created_at DESC"
+
     rows = await conn.fetch(
-        """
+        f"""
         SELECT
             e.id,
             e.image_id,
@@ -67,8 +83,10 @@ async def get_expenses(conn: asyncpg.Connection) -> list[dict]:
             e.created_at
         FROM expenses e
         JOIN images i ON i.id = e.image_id
-        ORDER BY e.date DESC NULLS LAST, e.created_at DESC
-        """
+        WHERE {where}
+        ORDER BY {order}
+        """,
+        month,
     )
     return [dict(r) for r in rows]
 
