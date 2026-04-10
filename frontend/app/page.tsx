@@ -27,21 +27,40 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
+  const [sort, setSort] = useState<"date" | "uploaded">("date");
+  const [sortReady, setSortReady] = useState(false);
+
+  // Read localStorage once — batched with setSortReady so only one re-render fires.
+  useEffect(() => {
+    const saved = localStorage.getItem("sort");
+    if (saved === "uploaded") setSort("uploaded");
+    setSortReady(true);
+  }, []);
+
+  const handleSetSort = (s: "date" | "uploaded") => {
+    localStorage.setItem("sort", s);
+    setSort(s);
+  };
+
+  const key = monthKey(offset);
 
   const refresh = useCallback(async () => {
     try {
-      setExpenses(await getExpenses());
+      setExpenses(await getExpenses(key, sort));
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [key, sort]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  // Only fetch after sort is initialised from localStorage.
+  useEffect(() => {
+    if (!sortReady) return;
+    refresh();
+  }, [refresh, sortReady]);
 
-  const key = monthKey(offset);
-  const filtered = expenses.filter(e => e.date?.startsWith(key));
+  const filtered = expenses;
   const total = filtered.reduce((s, e) => s + (e.amount ?? 0), 0);
 
   const totalFormatted = new Intl.NumberFormat("th-TH", {
@@ -55,7 +74,7 @@ export default function Home() {
     <div className="w-full max-w-sm min-h-screen bg-[#F5C518] relative">
 
       {/* ── Yellow header ── */}
-      <div className="px-5 pt-14 pb-24">
+      <div className="px-5 py-14">
         <div className="flex items-center justify-between mb-6">
           <span className="font-black text-[#0B1426] text-lg tracking-tight">🐶 WoofJot</span>
 
@@ -95,6 +114,23 @@ export default function Home() {
       {/* ── Dark sliding sheet ── */}
       <div className="bg-[#0B1426] rounded-t-[2rem] min-h-[calc(100vh-200px)] -mt-8 px-4 pt-5 pb-32 space-y-3">
 
+        {/* Sort toggle */}
+        <div className="flex rounded-xl bg-[#0F1E35] p-1 gap-1">
+          {(["date", "uploaded"] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => handleSetSort(s)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                sort === s
+                  ? "bg-[#F5C518] text-[#0B1426]"
+                  : "text-[#3D516B]"
+              }`}
+            >
+              {s === "date" ? "วันที่สลิป" : "วันที่อัปโหลด"}
+            </button>
+          ))}
+        </div>
+
         <MonthlySummary expenses={filtered} />
 
         {showUpload && (
@@ -109,7 +145,7 @@ export default function Home() {
             <div className="w-7 h-7 border-2 border-[#1E2D45] border-t-[#F5C518] rounded-full animate-spin" />
           </div>
         ) : (
-          <ExpenseList expenses={filtered} onRefresh={refresh} />
+          <ExpenseList expenses={filtered} onRefresh={refresh} sort={sort} />
         )}
       </div>
 
