@@ -119,26 +119,6 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
 
   return (
     <>
-      {/* Lightbox */}
-      {lightbox && expense.image_url && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-          onClick={() => setLightbox(false)}
-        >
-          <img
-            src={expense.image_url}
-            alt="slip"
-            className="max-w-[90vw] max-h-[90vh] rounded-2xl shadow-2xl object-contain"
-            onClick={e => e.stopPropagation()}
-          />
-          <button
-            onClick={() => setLightbox(false)}
-            className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       <div className="bg-[#0F1E35] rounded-2xl overflow-hidden border border-[#1E2D45]">
 
@@ -239,20 +219,40 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                     )}
                   </div>
 
-                  {/* Slip thumbnail */}
+                  {/* Slip thumbnail / expanded image */}
                   {(expense.thumbnail_url ?? expense.image_url) && (
                     <button
-                      onClick={() => setLightbox(true)}
-                      className="shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-[#2A3F58] self-start"
+                      onClick={() => setLightbox(v => !v)}
+                      className="shrink-0 flex flex-col items-center gap-1 self-start"
                     >
-                      <img
-                        src={(expense.thumbnail_url ?? expense.image_url)!}
-                        alt="slip"
-                        className="w-full h-full object-cover"
-                      />
+                      <div className="w-20 h-20 rounded-xl overflow-hidden border border-[#2A3F58]">
+                        <img
+                          src={(expense.thumbnail_url ?? expense.image_url)!}
+                          alt="slip"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <span className="text-[#F5C518] text-[10px] font-medium">แตะเพื่อดูสลิป</span>
                     </button>
                   )}
                 </div>
+
+                {/* Expanded slip image */}
+                {lightbox && expense.image_url && (
+                  <div className="relative">
+                    <img
+                      src={expense.image_url}
+                      alt="slip"
+                      className="w-full rounded-xl border border-[#2A3F58]"
+                    />
+                    <button
+                      onClick={() => setLightbox(false)}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center text-white text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
 
                 {/* Date/time */}
                 <p className="text-[#3D516B] text-xs">
