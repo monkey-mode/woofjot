@@ -22,7 +22,7 @@ interface Props {
 }
 
 export default function DonutChart({ segments }: Props) {
-  const CX = 60, CY = 60, R = 46, SW = 13, GAP = 4;
+  const CX = 60, CY = 60, R = 46, SW = 13;
 
   const total = segments.reduce((s, x) => s + x.pct, 0);
   if (total === 0) {
@@ -33,16 +33,18 @@ export default function DonutChart({ segments }: Props) {
     );
   }
 
+  // Only keep segments large enough to render, then scale to 360° so
+  // the drawn segments always fill the full circle with no gap.
+  const drawn = segments.filter(s => s.pct / total > 0.01);
+  const drawnTotal = drawn.reduce((s, x) => s + x.pct, 0);
   let cum = 0;
-  const arcs = segments
-    .filter(s => s.pct / total > 0.015)
-    .map(seg => {
-      const span = (seg.pct / total) * 360;
-      const s = cum + GAP / 2;
-      const e = cum + span - GAP / 2;
-      cum += span;
-      return { color: seg.color, s, e: Math.max(s + 1, e) };
-    });
+  const arcs = drawn.map(seg => {
+    const span = (seg.pct / drawnTotal) * 360;
+    const s = cum;
+    const e = cum + span;
+    cum += span;
+    return { color: seg.color, s, e };
+  });
 
   return (
     <svg viewBox="0 0 120 120" className="w-full h-full">
@@ -54,7 +56,7 @@ export default function DonutChart({ segments }: Props) {
           fill="none"
           stroke={a.color}
           strokeWidth={SW}
-          strokeLinecap="round"
+          strokeLinecap="butt"
         />
       ))}
     </svg>

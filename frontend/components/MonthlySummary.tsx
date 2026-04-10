@@ -15,6 +15,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   utilities:     "#A78BFA",
   health:        "#4ADE80",
   entertainment: "#FB923C",
+  invest:        "#34D399",
   other:         "#475569",
 };
 
@@ -25,6 +26,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   utilities:     "💡",
   health:        "❤️",
   entertainment: "🎮",
+  invest:        "📈",
   other:         "📋",
 };
 
