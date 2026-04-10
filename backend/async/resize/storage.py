@@ -30,6 +30,11 @@ async def download(key: str) -> bytes:
     return await loop.run_in_executor(None, _get)
 
 
+def object_url(key: str) -> str:
+    scheme = "https" if settings.minio_use_ssl else "http"
+    return f"{scheme}://{settings.minio_external_endpoint}/{settings.minio_bucket}/{key}"
+
+
 async def upload(key: str, data: bytes, content_type: str = "image/jpeg") -> None:
     loop = asyncio.get_event_loop()
     client = _client()

@@ -18,8 +18,16 @@ class Settings(BaseSettings):
     postgres_user: str = "woofjot"
     postgres_password: str = "woofjot"
 
-    resize_max_px: int = 1200
+    minio_external_endpoint: str = "localhost:9000"
+
+    resize_max_px: int = 1200       # LLM-optimised copy
     resize_quality: int = 85
+
+    resize_store_max_px: int = 2400  # storage-optimised original
+    resize_store_quality: int = 88
+
+    resize_thumb_max_px: int = 400   # UI thumbnail
+    resize_thumb_quality: int = 75
 
     @property
     def database_url(self) -> str:
