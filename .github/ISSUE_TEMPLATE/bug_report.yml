@@ -1,0 +1,69 @@
+name: Bug Report
+description: Something is broken or behaving unexpectedly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much detail as you can.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: When I upload a slip, the scan gets stuck at "resizing"...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this consistently?
+      placeholder: |
+        1. Upload a PNG slip from KBank
+        2. Wait for scan to complete
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      placeholder: The expense should appear in the list with the correct amount.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: service
+    attributes:
+      label: Which service is affected?
+      multiple: true
+      options:
+        - Frontend (UI)
+        - slip-api (port 8000)
+        - expenses-api (port 8001)
+        - resize-worker
+        - slip-worker
+        - MinIO / storage
+        - Redis
+        - PostgreSQL
+        - Docker Compose / setup
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste any relevant Docker Compose logs (`docker compose logs <service>`).
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Bank, file type, file size, OS, browser — anything that might help.
