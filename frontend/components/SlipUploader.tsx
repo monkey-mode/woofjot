@@ -70,11 +70,11 @@ export default function SlipUploader({ onDone, onCancel }: Props) {
         onDragLeave={() => setDragOver(false)}
         disabled={uploading}
         className={`
-          w-full bg-[#0F1E35] rounded-2xl border-2 border-dashed transition-all
+          w-full bg-surface rounded-2xl border-2 border-dashed transition-all
           flex flex-col items-center justify-center gap-3 py-8 px-4
           ${dragOver
-            ? "border-[#F5C518] bg-[#F5C518]/5"
-            : "border-[#1E2D45] hover:border-[#2A3F58]"
+            ? "border-accent bg-accent/5"
+            : "border-elevated hover:border-line"
           }
           ${uploading ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
         `}
@@ -88,18 +88,18 @@ export default function SlipUploader({ onDone, onCancel }: Props) {
         />
         {uploading ? (
           <>
-            <div className="w-8 h-8 border-2 border-[#1E3455] border-t-[#F5C518] rounded-full animate-spin" />
-            <p className="text-[#3D516B] text-sm font-medium">กำลังอัปโหลด...</p>
+            <div className="w-8 h-8 border-2 border-lift border-t-accent rounded-full animate-spin" />
+            <p className="text-muted text-sm font-medium">กำลังอัปโหลด...</p>
           </>
         ) : (
           <>
-            <div className="w-14 h-14 bg-[#F5C518]/10 rounded-2xl flex items-center justify-center text-3xl">
+            <div className="w-14 h-14 bg-accent/10 rounded-2xl flex items-center justify-center text-3xl">
               📄
             </div>
             <div className="text-center">
               <p className="text-white font-bold">อัปโหลดสลิป</p>
-              <p className="text-[#3D516B] text-sm mt-0.5">วางไฟล์ที่นี่ หรือแตะเพื่อเลือก</p>
-              <p className="text-[#2A3F58] text-xs mt-1">JPG · PNG · WEBP</p>
+              <p className="text-muted text-sm mt-0.5">วางไฟล์ที่นี่ หรือแตะเพื่อเลือก</p>
+              <p className="text-line text-xs mt-1">JPG · PNG · WEBP</p>
             </div>
           </>
         )}
@@ -108,7 +108,7 @@ export default function SlipUploader({ onDone, onCancel }: Props) {
       {onCancel && !uploading && (
         <button
           onClick={onCancel}
-          className="w-full text-center text-sm text-[#3D516B] hover:text-white py-1 transition-colors"
+          className="w-full text-center text-sm text-muted hover:text-white py-1 transition-colors"
         >
           ยกเลิก
         </button>
@@ -117,7 +117,7 @@ export default function SlipUploader({ onDone, onCancel }: Props) {
       {error && (
         <div className="bg-red-900/20 border border-red-900/40 rounded-2xl p-3 flex items-center justify-between">
           <p className="text-red-400 text-sm">{error}</p>
-          <button onClick={handleRetry} className="text-[#F5C518] text-sm font-semibold ml-3 shrink-0">
+          <button onClick={handleRetry} className="text-accent text-sm font-semibold ml-3 shrink-0">
             ลองใหม่
           </button>
         </div>

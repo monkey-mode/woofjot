@@ -65,7 +65,7 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
         {error && <p className="text-red-500/70 text-xs pl-8">{error}</p>}
         <button
           onClick={onFailed}
-          className="ml-8 text-xs text-[#F5C518] font-semibold underline underline-offset-2"
+          className="ml-8 text-xs text-accent font-semibold underline underline-offset-2"
         >
           ลองใหม่
         </button>
@@ -76,10 +76,10 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
   const currentStep = STATUS_ORDER[status] ?? 0;
 
   return (
-    <div className="bg-[#0F1E35] border border-[#1E2D45] rounded-2xl p-4 space-y-4">
+    <div className="bg-surface border border-elevated rounded-2xl p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-5 h-5 border-2 border-[#1E3455] border-t-[#F5C518] rounded-full animate-spin shrink-0" />
+        <div className="w-5 h-5 border-2 border-lift border-t-accent rounded-full animate-spin shrink-0" />
         <p className="text-white font-semibold text-sm">กำลังประมวลผลสลิป...</p>
       </div>
 
@@ -95,31 +95,31 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
               <div className={`
                 w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold
                 transition-all duration-300
-                ${done   ? "bg-[#F5C518] text-[#0B1426]" : ""}
-                ${active ? "bg-[#1E3455] ring-2 ring-[#F5C518]/60 ring-offset-1 ring-offset-[#0F1E35]" : ""}
-                ${!done && !active ? "bg-[#1E2D45]" : ""}
+                ${done   ? "bg-accent text-page" : ""}
+                ${active ? "bg-lift ring-2 ring-accent/60 ring-offset-1 ring-offset-surface" : ""}
+                ${!done && !active ? "bg-elevated" : ""}
               `}>
                 {done
                   ? <span>✓</span>
-                  : <span className={active ? "text-[#F5C518]" : "text-[#3D516B]"}>{i + 1}</span>
+                  : <span className={active ? "text-accent" : "text-muted"}>{i + 1}</span>
                 }
               </div>
 
               <span className={`text-sm transition-colors duration-300 flex-1 ${
-                done   ? "text-[#8FA3BF]" :
+                done   ? "text-faint" :
                 active ? "text-white font-semibold" :
-                         "text-[#2A3F58]"
+                         "text-line"
               }`}>
                 {step.label}
               </span>
 
               {active && (
-                <span className="text-[10px] text-[#F5C518]/60 animate-pulse font-medium">
+                <span className="text-[10px] text-accent/60 animate-pulse font-medium">
                   กำลังดำเนินการ
                 </span>
               )}
               {done && (
-                <span className="text-[10px] text-[#3D516B]">เสร็จ</span>
+                <span className="text-[10px] text-muted">เสร็จ</span>
               )}
             </div>
           );

@@ -66,7 +66,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   other:         "#475569",
 };
 
-const INPUT_CLS = "w-full bg-[#0B1426] border border-[#2A3F58] rounded-xl px-3 py-2 text-sm text-white placeholder-[#3D516B] focus:outline-none focus:ring-2 focus:ring-[#F5C518]/50";
+const INPUT_CLS = "w-full bg-page border border-line rounded-xl px-3 py-2 text-sm text-white placeholder-muted focus:outline-none focus:ring-2 focus:ring-accent/50";
 
 interface RowProps {
   expense: Expense;
@@ -123,7 +123,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
   return (
     <>
 
-      <div className="bg-[#0F1E35] rounded-2xl overflow-hidden border border-[#1E2D45]">
+      <div className="bg-surface rounded-2xl overflow-hidden border border-elevated">
 
         {/* ── Collapsed row (always visible, tap to expand) ── */}
         <button
@@ -140,14 +140,14 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <p className={`font-semibold text-sm truncate ${cat ? "text-white" : "text-[#3D516B]"}`}>
+            <p className={`font-semibold text-sm truncate ${cat ? "text-white" : "text-muted"}`}>
               {cat ? (CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat) : "ยังไม่ระบุหมวดหมู่"}
             </p>
             {expense.note && (
-              <p className="text-[#3D516B] text-xs truncate mt-0.5">{expense.note}</p>
+              <p className="text-muted text-xs truncate mt-0.5">{expense.note}</p>
             )}
             {!expense.note && expense.receiver && (
-              <p className="text-[#3D516B] text-xs truncate mt-0.5">{expense.receiver}</p>
+              <p className="text-muted text-xs truncate mt-0.5">{expense.receiver}</p>
             )}
           </div>
 
@@ -156,9 +156,9 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
             <div>
               <p className="font-bold text-white text-base">
                 {formatAmount(expense.amount)}{" "}
-                <span className="text-[#3D516B] text-xs font-normal">฿</span>
+                <span className="text-muted text-xs font-normal">฿</span>
               </p>
-              <p className="text-[#2A3F58] text-[10px] text-right">
+              <p className="text-line text-[10px] text-right">
                 {expense.time ? expense.time.slice(0, 5) : ""}
               </p>
             </div>
@@ -167,7 +167,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
               fill="none"
               stroke="currentColor"
               strokeWidth={2}
-              className={`w-4 h-4 text-[#2A3F58] shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+              className={`w-4 h-4 text-line shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
@@ -184,7 +184,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
             {/* Slip info section */}
             {!editing && (
               <div className="space-y-3">
-                <p className="text-[#3D516B] text-[10px] font-semibold uppercase tracking-widest">
+                <p className="text-muted text-[10px] font-semibold uppercase tracking-widest">
                   ข้อมูลจากสลิป
                 </p>
 
@@ -194,13 +194,13 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                     {/* Sender */}
                     {expense.sender && (
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#1E2D45] flex items-center justify-center shrink-0">
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#F5C518]">
+                        <div className="w-8 h-8 rounded-full bg-elevated flex items-center justify-center shrink-0">
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-accent">
                             <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
                           </svg>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[#3D516B] text-[10px]">จาก</p>
+                          <p className="text-muted text-[10px]">จาก</p>
                           <p className="text-white text-sm font-medium truncate">{expense.sender}</p>
                         </div>
                       </div>
@@ -209,13 +209,13 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                     {/* Receiver */}
                     {expense.receiver && (
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#1E2D45] flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-elevated flex items-center justify-center shrink-0">
                           <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[#22D3EE]">
                             <path d="M4 4h16v2H4zm0 6h16v2H4zm0 6h16v2H4z" />
                           </svg>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[#3D516B] text-[10px]">ถึง</p>
+                          <p className="text-muted text-[10px]">ถึง</p>
                           <p className="text-white text-sm font-medium truncate">{expense.receiver}</p>
                         </div>
                       </div>
@@ -228,14 +228,14 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                       onClick={() => setLightbox(v => !v)}
                       className="shrink-0 flex flex-col items-center gap-1 self-start"
                     >
-                      <div className="w-20 h-20 rounded-xl overflow-hidden border border-[#2A3F58]">
+                      <div className="w-20 h-20 rounded-xl overflow-hidden border border-line">
                         <img
                           src={(expense.thumbnail_url ?? expense.image_url)!}
                           alt="slip"
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <span className="text-[#F5C518] text-[10px] font-medium">แตะเพื่อดูสลิป</span>
+                      <span className="text-accent text-[10px] font-medium">แตะเพื่อดูสลิป</span>
                     </button>
                   )}
                 </div>
@@ -246,7 +246,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                     <img
                       src={expense.image_url}
                       alt="slip"
-                      className="w-full rounded-xl border border-[#2A3F58]"
+                      className="w-full rounded-xl border border-line"
                     />
                     <button
                       onClick={() => setLightbox(false)}
@@ -258,7 +258,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                 )}
 
                 {/* Date/time */}
-                <p className="text-[#3D516B] text-xs">
+                <p className="text-muted text-xs">
                   {formatDateTime(expense.date, expense.time)}
                 </p>
               </div>
@@ -267,7 +267,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
             {/* Edit form */}
             {editing && (
               <div className="space-y-2">
-                <p className="text-[#3D516B] text-[10px] font-semibold uppercase tracking-widest">
+                <p className="text-muted text-[10px] font-semibold uppercase tracking-widest">
                   แก้ไขข้อมูล
                 </p>
                 <div className="flex gap-2">
@@ -296,11 +296,11 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                   placeholder="บันทึกย่อ..." className={INPUT_CLS} />
                 <div className="flex gap-2 pt-1">
                   <button onClick={save} disabled={saving}
-                    className="flex-1 bg-[#F5C518] text-[#0B1426] text-sm py-2 rounded-xl font-bold hover:bg-[#E6B800] disabled:opacity-50 transition-colors">
+                    className="flex-1 bg-accent text-page text-sm py-2 rounded-xl font-bold hover:bg-[#E6B800] disabled:opacity-50 transition-colors">
                     บันทึก
                   </button>
                   <button onClick={() => setEditing(false)}
-                    className="text-sm text-[#3D516B] hover:text-white px-4 transition-colors">
+                    className="text-sm text-muted hover:text-white px-4 transition-colors">
                     ยกเลิก
                   </button>
                 </div>
@@ -309,10 +309,10 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
 
             {/* Action buttons */}
             {!editing && (
-              <div className="border-t border-[#1E2D45] pt-3 flex items-center justify-between">
+              <div className="border-t border-elevated pt-3 flex items-center justify-between">
                 <button
                   onClick={() => setEditing(true)}
-                  className="flex items-center gap-1.5 text-[#3D516B] hover:text-[#F5C518] text-xs font-medium transition-colors"
+                  className="flex items-center gap-1.5 text-muted hover:text-accent text-xs font-medium transition-colors"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
                     <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
@@ -321,7 +321,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                 </button>
                 <button
                   onClick={remove}
-                  className="flex items-center gap-1.5 text-[#3D516B] hover:text-red-400 text-xs font-medium transition-colors"
+                  className="flex items-center gap-1.5 text-muted hover:text-red-400 text-xs font-medium transition-colors"
                 >
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
@@ -335,7 +335,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
             {!editing && (
               <button
                 onClick={handleCollapse}
-                className="w-full text-center text-[#2A3F58] text-[10px] hover:text-[#3D516B] transition-colors pt-1"
+                className="w-full text-center text-line text-[10px] hover:text-muted transition-colors pt-1"
               >
                 ▲ ย่อ
               </button>
@@ -352,8 +352,8 @@ export default function ExpenseList({ expenses, onRefresh, sort = "date" }: Prop
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="text-5xl mb-4">🐶</div>
-        <p className="text-[#3D516B] font-semibold">ยังไม่มีรายการ</p>
-        <p className="text-[#2A3F58] text-sm mt-1">กดปุ่ม + เพื่ออัปโหลดสลิป</p>
+        <p className="text-muted font-semibold">ยังไม่มีรายการ</p>
+        <p className="text-line text-sm mt-1">กดปุ่ม + เพื่ออัปโหลดสลิป</p>
       </div>
     );
   }
@@ -367,10 +367,10 @@ export default function ExpenseList({ expenses, onRefresh, sort = "date" }: Prop
         return (
           <div key={day}>
             <div className="flex items-center justify-between px-1 mb-2">
-              <p className="text-[#3D516B] text-xs font-semibold uppercase tracking-wider">
+              <p className="text-muted text-xs font-semibold uppercase tracking-wider">
                 {dayLabel(day)}
               </p>
-              <p className="text-[#3D516B] text-xs font-semibold">
+              <p className="text-muted text-xs font-semibold">
                 {new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 }).format(dayTotal)} ฿
               </p>
             </div>
