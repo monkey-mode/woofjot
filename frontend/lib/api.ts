@@ -1,6 +1,6 @@
 import type {
-  Expense,
   ExpenseUpdate,
+  ExpensesResponse,
   PresignResponse,
   ScanStatusResponse,
 } from "./types";
@@ -52,8 +52,8 @@ export async function getScanStatus(
   return request<ScanStatusResponse>(SLIP_API, `/scan/${jobId}`);
 }
 
-export async function getExpenses(month: string, sort: "date" | "uploaded" = "date"): Promise<Expense[]> {
-  return request<Expense[]>(EXPENSES_API, `/expenses?month=${month}&sort=${sort}`);
+export async function getExpenses(month: string, sort: "date" | "uploaded" = "date"): Promise<ExpensesResponse> {
+  return request<ExpensesResponse>(EXPENSES_API, `/expenses?month=${month}&sort=${sort}`);
 }
 
 export async function updateExpense(

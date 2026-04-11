@@ -52,11 +52,13 @@ async def get_expenses(
     conn: asyncpg.Connection,
     month: str,
     sort: str = "date",
-) -> list[dict]:
-    """Return expenses for the given YYYY-MM month.
+) -> tuple[list[dict], list[dict]]:
+    """Return (expenses, summary) for the given YYYY-MM month.
 
     When sort='date'     → filter & order by slip date (e.date).
     When sort='uploaded' → filter & order by upload time (e.created_at).
+
+    summary is sorted DESC by total, ties broken by category ASC.
     """
     if sort == "uploaded":
         where = "TO_CHAR(e.created_at AT TIME ZONE 'UTC', 'YYYY-MM') = $1"
@@ -88,7 +90,22 @@ async def get_expenses(
         """,
         month,
     )
-    return [dict(r) for r in rows]
+
+    summary_rows = await conn.fetch(
+        f"""
+        SELECT
+            e.category,
+            SUM(e.amount)::float AS total
+        FROM expenses e
+        WHERE e.category IS NOT NULL
+          AND {where}
+        GROUP BY e.category
+        ORDER BY total DESC, e.category ASC
+        """,
+        month,
+    )
+
+    return [dict(r) for r in rows], [dict(r) for r in summary_rows]
 
 
 async def update_expense(

@@ -1,11 +1,11 @@
 "use client";
 
-import type { Expense } from "@/lib/types";
+import type { CategorySummary } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 import DonutChart, { type DonutSegment } from "./DonutChart";
 
 interface Props {
-  expenses: Expense[];
+  summary: CategorySummary[];
   loading?: boolean;
 }
 
@@ -31,7 +31,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   other:         "📋",
 };
 
-export default function MonthlySummary({ expenses, loading }: Props) {
+export default function MonthlySummary({ summary, loading }: Props) {
   if (loading) {
     return (
       <div className="flex gap-4 items-center animate-pulse">
@@ -48,22 +48,14 @@ export default function MonthlySummary({ expenses, loading }: Props) {
     );
   }
 
-  const total = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
+  if (summary.length === 0) return null;
 
-  const byCategory = expenses.reduce<Record<string, number>>((acc, e) => {
-    if (!e.category) return acc;   // exclude uncategorised from breakdown
-    acc[e.category] = (acc[e.category] ?? 0) + (e.amount ?? 0);
-    return acc;
-  }, {});
+  const total = summary.reduce((s, c) => s + c.total, 0);
 
-  const sorted = Object.entries(byCategory).sort(([, a], [, b]) => b - a);
-
-  const segments: DonutSegment[] = sorted.map(([cat, amount]) => ({
+  const segments: DonutSegment[] = summary.map(({ category, total: amount }) => ({
     pct: amount,
-    color: CATEGORY_COLORS[cat] ?? "#475569",
+    color: CATEGORY_COLORS[category] ?? "#475569",
   }));
-
-  if (expenses.length === 0) return null;
 
   return (
     <div className="flex gap-4 items-center">
@@ -84,15 +76,15 @@ export default function MonthlySummary({ expenses, loading }: Props) {
 
       {/* Category list — scrollable when > 4 categories */}
       <div className="flex-1 min-w-0 max-h-[112px] overflow-y-auto space-y-2 pr-1 scrollbar-none">
-        {sorted.map(([cat, amount]) => {
+        {summary.map(({ category, total: amount }) => {
           const pct = total > 0 ? (amount / total) * 100 : 0;
           return (
-            <div key={cat}>
+            <div key={category}>
               <div className="flex items-center justify-between mb-0.5">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-sm">{CATEGORY_ICONS[cat] ?? "📋"}</span>
+                  <span className="text-sm">{CATEGORY_ICONS[category] ?? "📋"}</span>
                   <span className="text-faint text-xs truncate">
-                    {CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat}
+                    {CATEGORIES[category as keyof typeof CATEGORIES] ?? category}
                   </span>
                 </div>
                 <span className="text-white text-xs font-semibold ml-2 shrink-0">
@@ -106,7 +98,7 @@ export default function MonthlySummary({ expenses, loading }: Props) {
                   className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${pct}%`,
-                    backgroundColor: CATEGORY_COLORS[cat] ?? "#475569",
+                    backgroundColor: CATEGORY_COLORS[category] ?? "#475569",
                   }}
                 />
               </div>
