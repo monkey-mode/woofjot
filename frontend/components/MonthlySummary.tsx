@@ -82,9 +82,9 @@ export default function MonthlySummary({ expenses, loading }: Props) {
         </div>
       </div>
 
-      {/* Category list */}
-      <div className="flex-1 space-y-2 min-w-0">
-        {sorted.slice(0, 4).map(([cat, amount]) => {
+      {/* Category list — scrollable when > 4 categories */}
+      <div className="flex-1 min-w-0 max-h-[112px] overflow-y-auto space-y-2 pr-1 scrollbar-none">
+        {sorted.map(([cat, amount]) => {
           const pct = total > 0 ? (amount / total) * 100 : 0;
           return (
             <div key={cat}>

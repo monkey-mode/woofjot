@@ -35,7 +35,7 @@ export default function DonutChart({ segments }: Props) {
 
   // Only keep segments large enough to render, then scale to 360° so
   // the drawn segments always fill the full circle with no gap.
-  const drawn = segments.filter(s => s.pct / total > 0.01);
+  const drawn = segments.filter(s => s.pct / total > 0.003);
   const drawnTotal = drawn.reduce((s, x) => s + x.pct, 0);
   let cum = 0;
   const arcs = drawn.map(seg => {

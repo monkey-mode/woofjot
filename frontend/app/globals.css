@@ -11,3 +11,12 @@
     background-color: #0B1426;
   }
 }
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
