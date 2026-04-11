@@ -26,6 +26,16 @@ class ExpenseResponse(BaseModel):
     created_at: datetime
 
 
+class CategorySummary(BaseModel):
+    category: str
+    total: float
+
+
+class ExpensesResponse(BaseModel):
+    expenses: list[ExpenseResponse]
+    summary: list[CategorySummary]
+
+
 class ExpenseUpdate(BaseModel):
     amount: float | None = None
     date: _Date | None = None

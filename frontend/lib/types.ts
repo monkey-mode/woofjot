@@ -40,6 +40,16 @@ export interface Expense {
   created_at: string;
 }
 
+export interface CategorySummary {
+  category: string;
+  total: number;
+}
+
+export interface ExpensesResponse {
+  expenses: Expense[];
+  summary: CategorySummary[];
+}
+
 export interface ExpenseUpdate {
   amount?: number;
   date?: string;

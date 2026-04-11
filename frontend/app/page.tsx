@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getExpenses } from "@/lib/api";
-import type { Expense } from "@/lib/types";
+import type { CategorySummary, Expense } from "@/lib/types";
 import SlipUploader from "@/components/SlipUploader";
 import ExpenseList from "@/components/ExpenseList";
 import MonthlySummary from "@/components/MonthlySummary";
@@ -24,6 +24,7 @@ function monthLabel(key: string): string {
 
 export default function Home() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [summary, setSummary] = useState<CategorySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
@@ -46,7 +47,9 @@ export default function Home() {
 
   const refresh = useCallback(async () => {
     try {
-      setExpenses(await getExpenses(key, sort));
+      const { expenses, summary } = await getExpenses(key, sort);
+      setExpenses(expenses);
+      setSummary(summary);
     } catch {
       // ignore
     } finally {
@@ -61,7 +64,7 @@ export default function Home() {
   }, [refresh, sortReady]);
 
   const filtered = expenses;
-  const total = filtered.reduce((s, e) => s + (e.amount ?? 0), 0);
+  const total = summary.reduce((s, c) => s + c.total, 0);
 
   const totalFormatted = new Intl.NumberFormat("th-TH", {
     style: "currency",
@@ -140,7 +143,7 @@ export default function Home() {
           ))}
         </div>
 
-        <MonthlySummary expenses={filtered} loading={loading} />
+        <MonthlySummary summary={summary} loading={loading} />
 
         {showUpload && (
           <SlipUploader
