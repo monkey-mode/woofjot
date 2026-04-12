@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncpg
+from datetime import date as _date
 
 _MIGRATIONS = """
 CREATE TABLE IF NOT EXISTS images (
@@ -117,7 +118,7 @@ async def create_expense(conn: asyncpg.Connection, data: dict) -> int:
         RETURNING id
         """,
         data.get("amount"),
-        data.get("date"),
+        data.get("date") or _date.today(),
         data.get("time"),
         data.get("category"),
         data.get("sender"),
