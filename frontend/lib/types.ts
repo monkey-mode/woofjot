@@ -26,8 +26,8 @@ export interface ScanStatusResponse {
 
 export interface Expense {
   id: number;
-  image_id: number;
-  image_url: string;
+  image_id: number | null;
+  image_url: string | null;
   thumbnail_url: string | null;
   amount: number | null;
   currency: string;
@@ -48,6 +48,16 @@ export interface CategorySummary {
 export interface ExpensesResponse {
   expenses: Expense[];
   summary: CategorySummary[];
+}
+
+export interface ExpenseCreate {
+  amount?: number;
+  date?: string;
+  time?: string;
+  sender?: string;
+  receiver?: string;
+  category?: string;
+  note?: string;
 }
 
 export interface ExpenseUpdate {
