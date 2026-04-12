@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getExpenses } from "@/lib/api";
 import type { CategorySummary, Expense } from "@/lib/types";
 import SlipUploader from "@/components/SlipUploader";
+import ManualEntryForm from "@/components/ManualEntryForm";
 import ExpenseList from "@/components/ExpenseList";
 import MonthlySummary from "@/components/MonthlySummary";
 
@@ -27,7 +28,7 @@ export default function Home() {
   const [summary, setSummary] = useState<CategorySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
-  const [showUpload, setShowUpload] = useState(false);
+  const [panelMode, setPanelMode] = useState<null | "picker" | "upload" | "manual">(null);
   const [sort, setSort] = useState<"date" | "uploaded">("date");
   const [sortReady, setSortReady] = useState(false);
 
@@ -145,10 +146,36 @@ export default function Home() {
 
         <MonthlySummary summary={summary} loading={loading} />
 
-        {showUpload && (
+        {panelMode === "picker" && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPanelMode("upload")}
+              className="flex-1 bg-surface border border-elevated rounded-2xl py-3 text-sm font-semibold text-white flex flex-col items-center gap-1 transition-colors hover:bg-elevated"
+            >
+              <span className="text-xl">📷</span>
+              <span>อัปโหลดสลิป</span>
+            </button>
+            <button
+              onClick={() => setPanelMode("manual")}
+              className="flex-1 bg-surface border border-elevated rounded-2xl py-3 text-sm font-semibold text-white flex flex-col items-center gap-1 transition-colors hover:bg-elevated"
+            >
+              <span className="text-xl">✏️</span>
+              <span>บันทึกเอง</span>
+            </button>
+          </div>
+        )}
+
+        {panelMode === "upload" && (
           <SlipUploader
-            onDone={() => { setShowUpload(false); refresh(); }}
-            onCancel={() => setShowUpload(false)}
+            onDone={() => { setPanelMode(null); refresh(); }}
+            onCancel={() => setPanelMode(null)}
+          />
+        )}
+
+        {panelMode === "manual" && (
+          <ManualEntryForm
+            onDone={() => { setPanelMode(null); refresh(); }}
+            onCancel={() => setPanelMode(null)}
           />
         )}
 
@@ -189,16 +216,16 @@ export default function Home() {
 
           {/* FAB */}
           <button
-            onClick={() => setShowUpload(v => !v)}
+            onClick={() => setPanelMode(m => m === null ? "picker" : null)}
             className={`
               w-14 h-14 rounded-full shadow-2xl flex items-center justify-center -mt-7
               transition-all duration-200
-              ${showUpload
+              ${panelMode !== null
                 ? "bg-lift text-subtle rotate-45 ring-4 ring-lift/40"
                 : "bg-accent text-page ring-4 ring-accent/20"
               }
             `}
-            aria-label="อัปโหลดสลิป"
+            aria-label="เพิ่มรายการ"
           >
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
               <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />

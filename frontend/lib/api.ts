@@ -1,4 +1,5 @@
 import type {
+  ExpenseCreate,
   ExpenseUpdate,
   ExpensesResponse,
   PresignResponse,
@@ -54,6 +55,14 @@ export async function getScanStatus(
 
 export async function getExpenses(month: string, sort: "date" | "uploaded" = "date"): Promise<ExpensesResponse> {
   return request<ExpensesResponse>(EXPENSES_API, `/expenses?month=${month}&sort=${sort}`);
+}
+
+export async function createExpense(body: ExpenseCreate): Promise<void> {
+  await request<void>(EXPENSES_API, "/expenses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function updateExpense(

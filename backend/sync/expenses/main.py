@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from models import CategorySummary, ExpenseResponse, ExpensesResponse, ExpenseUpdate
+from models import CategorySummary, ExpenseCreate, ExpenseResponse, ExpensesResponse, ExpenseUpdate
 import db
 
 logging.basicConfig(
@@ -57,6 +57,14 @@ async def list_expenses(request: Request, month: str, sort: str = "date"):
     )
 
 
+@app.post("/expenses", response_model=ExpenseResponse, status_code=201)
+async def create_expense(body: ExpenseCreate, request: Request):
+    async with request.app.state.db.acquire() as conn:
+        expense_id = await db.create_expense(conn, body.model_dump(exclude_unset=True))
+        row = await db.get_expense_by_id(conn, expense_id)
+    return ExpenseResponse(**row)
+
+
 @app.patch("/expenses/{expense_id}", response_model=None, status_code=204)
 async def update_expense(expense_id: int, body: ExpenseUpdate, request: Request):
     async with request.app.state.db.acquire() as conn:
@@ -66,4 +74,4 @@ async def update_expense(expense_id: int, body: ExpenseUpdate, request: Request)
 @app.delete("/expenses/{expense_id}", response_model=None, status_code=204)
 async def delete_expense(expense_id: int, request: Request):
     async with request.app.state.db.acquire() as conn:
-        await db.delete_image_by_expense_id(conn, expense_id)
+        await db.delete_expense(conn, expense_id)

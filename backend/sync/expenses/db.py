@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncpg
+from datetime import date as _date
 
 _MIGRATIONS = """
 CREATE TABLE IF NOT EXISTS images (
@@ -40,6 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC);
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS sender TEXT;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receiver TEXT;
 ALTER TABLE images  ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
+ALTER TABLE expenses ALTER COLUMN image_id DROP NOT NULL;
 """
 
 
@@ -84,7 +86,7 @@ async def get_expenses(
             e.note,
             e.created_at
         FROM expenses e
-        JOIN images i ON i.id = e.image_id
+        LEFT JOIN images i ON i.id = e.image_id
         WHERE {where}
         ORDER BY {order}
         """,
@@ -108,6 +110,49 @@ async def get_expenses(
     return [dict(r) for r in rows], [dict(r) for r in summary_rows]
 
 
+async def create_expense(conn: asyncpg.Connection, data: dict) -> int:
+    return await conn.fetchval(
+        """
+        INSERT INTO expenses (amount, currency, date, time, category, sender, receiver, note)
+        VALUES ($1, 'THB', $2, $3, $4, $5, $6, $7)
+        RETURNING id
+        """,
+        data.get("amount"),
+        data.get("date") or _date.today(),
+        data.get("time"),
+        data.get("category"),
+        data.get("sender"),
+        data.get("receiver"),
+        data.get("note"),
+    )
+
+
+async def get_expense_by_id(conn: asyncpg.Connection, expense_id: int) -> dict | None:
+    row = await conn.fetchrow(
+        """
+        SELECT
+            e.id,
+            e.image_id,
+            i.url           AS image_url,
+            i.thumbnail_url AS thumbnail_url,
+            e.amount,
+            e.currency,
+            e.date,
+            e.time,
+            e.category,
+            e.sender,
+            e.receiver,
+            e.note,
+            e.created_at
+        FROM expenses e
+        LEFT JOIN images i ON i.id = e.image_id
+        WHERE e.id = $1
+        """,
+        expense_id,
+    )
+    return dict(row) if row else None
+
+
 async def update_expense(
     conn: asyncpg.Connection,
     expense_id: int,
@@ -126,14 +171,13 @@ async def update_expense(
     )
 
 
-async def delete_image_by_expense_id(
-    conn: asyncpg.Connection,
-    expense_id: int,
-) -> None:
-    await conn.execute(
-        """
-        DELETE FROM images
-        WHERE id = (SELECT image_id FROM expenses WHERE id = $1)
-        """,
-        expense_id,
+async def delete_expense(conn: asyncpg.Connection, expense_id: int) -> None:
+    image_id = await conn.fetchval(
+        "SELECT image_id FROM expenses WHERE id = $1", expense_id
     )
+    if image_id:
+        # Deleting the image cascades to the expense row.
+        await conn.execute("DELETE FROM images WHERE id = $1", image_id)
+    else:
+        # Manual entry — no image row, delete the expense directly.
+        await conn.execute("DELETE FROM expenses WHERE id = $1", expense_id)

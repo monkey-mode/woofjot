@@ -12,8 +12,8 @@ _Time = time
 
 class ExpenseResponse(BaseModel):
     id: int
-    image_id: int
-    image_url: str
+    image_id: int | None
+    image_url: str | None
     thumbnail_url: str | None
     amount: float | None
     currency: str
@@ -24,6 +24,16 @@ class ExpenseResponse(BaseModel):
     receiver: str | None
     note: str | None
     created_at: datetime
+
+
+class ExpenseCreate(BaseModel):
+    amount: float | None = None
+    date: _Date | None = None
+    time: _Time | None = None
+    sender: str | None = None
+    receiver: str | None = None
+    category: str | None = None
+    note: str | None = None
 
 
 class CategorySummary(BaseModel):
