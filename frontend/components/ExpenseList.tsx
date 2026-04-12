@@ -222,8 +222,8 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                     )}
                   </div>
 
-                  {/* Slip thumbnail / expanded image */}
-                  {(expense.thumbnail_url ?? expense.image_url) && (
+                  {/* Slip thumbnail / manual placeholder */}
+                  {(expense.thumbnail_url ?? expense.image_url) ? (
                     <button
                       onClick={() => setLightbox(v => !v)}
                       className="shrink-0 flex flex-col items-center gap-1 self-start"
@@ -237,6 +237,13 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                       </div>
                       <span className="text-accent text-[10px] font-medium">แตะเพื่อดูสลิป</span>
                     </button>
+                  ) : (
+                    <div className="shrink-0 flex flex-col items-center gap-1 self-start">
+                      <div className="w-20 h-20 rounded-xl border border-line bg-elevated flex items-center justify-center">
+                        <span className="text-3xl">✏️</span>
+                      </div>
+                      <span className="text-muted text-[10px]">บันทึกเอง</span>
+                    </div>
                   )}
                 </div>
 
@@ -353,7 +360,7 @@ export default function ExpenseList({ expenses, onRefresh, sort = "date" }: Prop
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="text-5xl mb-4">🐶</div>
         <p className="text-muted font-semibold">ยังไม่มีรายการ</p>
-        <p className="text-line text-sm mt-1">กดปุ่ม + เพื่ออัปโหลดสลิป</p>
+        <p className="text-line text-sm mt-1">กดปุ่ม + เพื่อเพิ่มรายการ</p>
       </div>
     );
   }
