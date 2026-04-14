@@ -104,9 +104,10 @@ No external services. Everything runs locally with one command.
 │   │   ├── page.tsx
 │   │   └── layout.tsx
 │   ├── components/
-│   │   ├── SlipUploader.tsx      # presign → PUT → poll flow
+│   │   ├── SlipUploader.tsx      # presign → PUT → poll flow (up to 10 files)
 │   │   ├── ScanStatus.tsx        # polls GET /scan/{job_id}
 │   │   ├── ExpenseList.tsx       # expense list grouped by month
+│   │   ├── ManualEntryForm.tsx   # manual income/expense entry form
 │   │   └── MonthlySummary.tsx    # monthly total + category breakdown
 │   ├── lib/
 │   │   ├── api.ts                # all backend fetch calls
@@ -251,16 +252,18 @@ CREATE TABLE IF NOT EXISTS images (
 --   done       → UPDATE after expense inserted successfully
 --   failed     → UPDATE if any step throws
 
--- Expense extracted from slip image
+-- Expense extracted from slip image OR entered manually (no image)
 CREATE TABLE IF NOT EXISTS expenses (
   id          SERIAL PRIMARY KEY,
-  image_id    INTEGER NOT NULL REFERENCES images(id) ON DELETE CASCADE,
+  image_id    INTEGER REFERENCES images(id) ON DELETE CASCADE,  -- NULL for manual entries
   amount      NUMERIC(12, 2),
   currency    TEXT DEFAULT 'THB',
   date        DATE,
   time        TIME,
-  category    TEXT,                           -- user fills in post-scan
-  note        TEXT,                           -- user fills in post-scan
+  category    TEXT,                           -- extracted by Claude or set by user
+  sender      TEXT,                           -- from/to extracted from slip or entered manually
+  receiver    TEXT,
+  note        TEXT,
   raw_text    TEXT,
   created_at  TIMESTAMPTZ DEFAULT now(),
   updated_at  TIMESTAMPTZ DEFAULT now()
@@ -273,12 +276,13 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC);
 
 **Design rules:**
 - `images.status` is the only source of truth — never duplicate state elsewhere
-- `expenses` is only inserted on `status=done` — never before
-- `ON DELETE CASCADE` means deleting an image cleans up its expense automatically
+- Slip-backed expenses: inserted by slip-worker on `status=done`; `ON DELETE CASCADE` means deleting the image also deletes the expense
+- Manual entries: `image_id = NULL`; deleting requires a direct `DELETE FROM expenses` (no cascade)
 - `size_bytes` and `mime_type` come from the MinIO S3 event — never trust the client for these
 - `images.url` initially points to the raw upload; resize-worker updates it to `_store.jpg` (high-quality compressed)
 - `images.thumbnail_url` is `null` until resize-worker populates it with the `_thumb.jpg` URL
 - `images.storage_key` points to the LLM-optimised copy (`_opt.jpg`) used for Claude extraction
+- `GET /expenses` uses `LEFT JOIN images` so manual entries (no image row) appear alongside slip-backed ones
 
 ## API endpoints
 
@@ -365,27 +369,70 @@ Required query params:
 `sort=date`: filters by `e.date` month, orders by `e.date DESC NULLS LAST, e.created_at DESC`  
 `sort=uploaded`: filters by `e.created_at` month (UTC), orders by `e.created_at DESC`
 
-All filtering and ordering happens in SQL — the frontend receives only the rows it needs.
+All filtering, ordering, and category aggregation happen in SQL — the frontend receives only what it needs.
 
 ```json
-[
-  {
-    "id": 1,
-    "image_id": 1,
-    "image_url": "http://localhost:9000/slips/abc123_store.jpg",
-    "thumbnail_url": "http://localhost:9000/slips/abc123_thumb.jpg",
-    "amount": 1500.00,
-    "currency": "THB",
-    "date": "2026-03-29",
-    "time": "14:32:00",
-    "category": "food",
-    "sender": "Somchai K.",
-    "receiver": "Coffee Shop Co., Ltd.",
-    "note": "lunch",
-    "created_at": "2026-03-29T14:32:00Z"
-  }
-]
+{
+  "expenses": [
+    {
+      "id": 1,
+      "image_id": 1,
+      "image_url": "http://localhost:9000/slips/abc123_store.jpg",
+      "thumbnail_url": "http://localhost:9000/slips/abc123_thumb.jpg",
+      "amount": 1500.00,
+      "currency": "THB",
+      "date": "2026-03-29",
+      "time": "14:32:00",
+      "category": "food",
+      "sender": "Somchai K.",
+      "receiver": "Coffee Shop Co., Ltd.",
+      "note": "lunch",
+      "created_at": "2026-03-29T14:32:00Z"
+    },
+    {
+      "id": 2,
+      "image_id": null,
+      "image_url": null,
+      "thumbnail_url": null,
+      "amount": 500.00,
+      "currency": "THB",
+      "date": "2026-03-29",
+      "time": null,
+      "category": "transport",
+      "sender": null,
+      "receiver": null,
+      "note": "taxi",
+      "created_at": "2026-03-29T10:00:00Z"
+    }
+  ],
+  "summary": [
+    { "category": "food", "total": 1500.00 },
+    { "category": "transport", "total": 500.00 }
+  ]
+}
 ```
+
+`summary` is sorted DESC by total, ties broken by category ASC. Frontend must not re-aggregate — render the summary array as-is.
+
+Manual entries have `image_id: null`, `image_url: null`, `thumbnail_url: null`. The frontend shows a ✏️ placeholder icon in the expanded detail panel instead of a slip thumbnail.
+
+#### POST /expenses
+
+Creates a manual expense without a slip image. All fields optional except `amount` (validated in UI only). `date` defaults to today server-side if omitted.
+
+```json
+{
+  "amount": 500.00,
+  "date": "2026-03-29",
+  "time": "10:00:00",
+  "category": "transport",
+  "sender": "Me",
+  "receiver": "Grab",
+  "note": "taxi to airport"
+}
+```
+
+Returns 201 + the created expense object.
 
 #### PATCH /expenses/{id}
 
@@ -405,7 +452,8 @@ All fields are optional. Only provided fields are updated.
 
 #### DELETE /expenses/{id}
 
-Deletes the `images` row — CASCADE removes the linked expense.
+- If `image_id` is set: deletes the `images` row — CASCADE removes the linked expense.
+- If `image_id` is null (manual entry): deletes the `expenses` row directly.
 
 ## resize-worker: process_resize
 
@@ -501,13 +549,22 @@ If a field cannot be found, set it to null.
 
 `extract_slip` parses the JSON. If `result.get("not_a_slip")` is true it raises `ValueError("not_a_slip")`. `process_scan` catches this sentinel and stores a Thai-language error message. All other exceptions store the raw error string.
 
+## Frontend: FAB and entry modes
+
+The FAB opens a **picker** with two options:
+
+- **📷 อัปโหลดสลิป** → shows `SlipUploader` (scan pipeline)
+- **✏️ บันทึกเอง** → shows `ManualEntryForm` (direct entry)
+
+State: `panelMode: null | "picker" | "upload" | "manual"` in `page.tsx`. FAB rotates to × when any panel is open.
+
 ## Frontend: upload flow
 
 ```
-1. User selects file
-2. POST /upload/presign  → { upload_url, key, job_id }
+1. User selects up to 10 files via SlipUploader
+2. For each file: POST /upload/presign → { upload_url, key, job_id }
 3. PUT file bytes to upload_url  (raw bytes, not FormData)
-4. Start polling GET /scan/{job_id} every 2 seconds
+4. Start polling GET /scan/{job_id} every 2 seconds per file
 5. Show Thai status label per response status:
      pending    → "รอการอัปโหลด..."
      uploaded   → "อัปโหลดสำเร็จ กำลังเตรียม..."
@@ -521,16 +578,24 @@ If a field cannot be found, set it to null.
 
 - Use raw `fetch` with `method: "PUT"` and `body: file` for MinIO upload
 - Do not use `FormData` for the PUT — presigned URLs expect raw bytes
-- Timeout polling after 30 attempts (60 seconds)
+- Timeout polling after 30 attempts (60 seconds) per file
+
+## Frontend: manual entry flow
+
+`ManualEntryForm` fields: amount (required), date (defaults to today), time, category (select), sender, receiver, note.
+
+On submit: `POST /expenses` → `onDone()` → list refreshes. No polling needed — response is immediate.
 
 ## Frontend: expense list
 
 - Expenses are fetched with `GET /expenses?month=YYYY-MM&sort=date|uploaded`
+- Response is `{ expenses, summary }` — **never re-aggregate in the frontend**, render `summary` as-is
 - Sort preference is persisted in `localStorage` under key `"sort"`
 - On mount, `useEffect` reads localStorage and sets `sort` state, then sets `sortReady=true`
 - The fetch is gated behind `sortReady` so exactly one request fires with the correct sort value — avoids a double-fetch when localStorage value differs from the React default
 - The sort toggle stays visually neutral (`sortReady && sort === s`) until localStorage is confirmed, preventing a flash from the default to the saved value
 - While loading, skeleton placeholders replace the header total, MonthlySummary donut, and expense rows
+- Manual entries show a ✏️ placeholder icon in the expanded drawer (where the slip thumbnail appears for scanned entries)
 
 ## Expense categories
 
@@ -601,7 +666,7 @@ to convert — do not post-process dates manually.
 | Redis pub/sub (Docker)    | AWS ElastiCache / Upstash Redis          |
 | Async workers (Docker)    | Celery, ARQ, or AWS Lambda + SQS         |
 | PostgreSQL (Docker)       | AWS RDS / Supabase PostgreSQL            |
-| No auth                   | Supabase Auth (LINE + Google)            |
+| No auth                   | NextAuth.js (Google OAuth, expandable to LINE) |
 | HTTP webhook              | S3 Event Notifications → SNS → SQS      |
 
 ## What not to build in the POC
