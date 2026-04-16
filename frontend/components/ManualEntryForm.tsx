@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createExpense } from "@/lib/api";
 import { CATEGORIES } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   onDone: () => void;
@@ -27,6 +28,8 @@ function today(): string {
 }
 
 export default function ManualEntryForm({ onDone, onCancel }: Props) {
+  const { t } = useI18n();
+
   const [amount, setAmount]     = useState("");
   const [date, setDate]         = useState(today());
   const [time, setTime]         = useState("");
@@ -39,7 +42,7 @@ export default function ManualEntryForm({ onDone, onCancel }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!amount) { setError("กรุณากรอกจำนวนเงิน"); return; }
+    if (!amount) { setError(t.manualEntry.amountRequired); return; }
     setError(null);
     setSaving(true);
     try {
@@ -54,7 +57,7 @@ export default function ManualEntryForm({ onDone, onCancel }: Props) {
       });
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
+      setError(e instanceof Error ? e.message : t.manualEntry.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -62,14 +65,14 @@ export default function ManualEntryForm({ onDone, onCancel }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="bg-surface rounded-2xl border border-elevated p-4 space-y-3">
-      <p className="text-muted text-[10px] font-semibold uppercase tracking-widest">บันทึกรายการเอง</p>
+      <p className="text-muted text-[10px] font-semibold uppercase tracking-widest">{t.manualEntry.header}</p>
 
       {/* Amount + Date */}
       <div className="flex gap-2">
         <input
           value={amount}
           onChange={e => setAmount(e.target.value)}
-          placeholder="จำนวนเงิน *"
+          placeholder={t.manualEntry.amount}
           type="number"
           inputMode="decimal"
           className={INPUT_CLS + " flex-1"}
@@ -92,9 +95,9 @@ export default function ManualEntryForm({ onDone, onCancel }: Props) {
 
       {/* Category */}
       <select value={category} onChange={e => setCategory(e.target.value)} className={INPUT_CLS}>
-        <option value="">เลือกหมวดหมู่</option>
-        {Object.entries(CATEGORIES).map(([k, v]) => (
-          <option key={k} value={k}>{CATEGORY_ICONS[k]} {v}</option>
+        <option value="">{t.manualEntry.selectCategory}</option>
+        {CATEGORIES.map(k => (
+          <option key={k} value={k}>{CATEGORY_ICONS[k]} {t.categories[k]}</option>
         ))}
       </select>
 
@@ -103,13 +106,13 @@ export default function ManualEntryForm({ onDone, onCancel }: Props) {
         <input
           value={sender}
           onChange={e => setSender(e.target.value)}
-          placeholder="จาก (ผู้โอน)"
+          placeholder={t.manualEntry.sender}
           className={INPUT_CLS + " flex-1"}
         />
         <input
           value={receiver}
           onChange={e => setReceiver(e.target.value)}
-          placeholder="ถึง (ผู้รับ)"
+          placeholder={t.manualEntry.receiver}
           className={INPUT_CLS + " flex-1"}
         />
       </div>
@@ -118,7 +121,7 @@ export default function ManualEntryForm({ onDone, onCancel }: Props) {
       <input
         value={note}
         onChange={e => setNote(e.target.value)}
-        placeholder="บันทึกย่อ..."
+        placeholder={t.manualEntry.note}
         className={INPUT_CLS}
       />
 
@@ -131,7 +134,7 @@ export default function ManualEntryForm({ onDone, onCancel }: Props) {
           disabled={saving}
           className="flex-1 bg-accent text-page text-sm py-2 rounded-xl font-bold disabled:opacity-50 transition-colors"
         >
-          {saving ? "กำลังบันทึก..." : "บันทึก"}
+          {saving ? t.manualEntry.saving : t.manualEntry.save}
         </button>
         {onCancel && (
           <button
@@ -139,7 +142,7 @@ export default function ManualEntryForm({ onDone, onCancel }: Props) {
             onClick={onCancel}
             className="text-sm text-muted hover:text-white px-4 transition-colors"
           >
-            ยกเลิก
+            {t.manualEntry.cancel}
           </button>
         )}
       </div>
