@@ -111,7 +111,11 @@ No external services. Everything runs locally with one command.
 │   │   └── MonthlySummary.tsx    # monthly total + category breakdown
 │   ├── lib/
 │   │   ├── api.ts                # all backend fetch calls
-│   │   └── types.ts              # shared TypeScript interfaces
+│   │   ├── types.ts              # shared TypeScript interfaces
+│   │   ├── i18n.tsx              # I18nProvider, useI18n hook, toBCP47 helper
+│   │   └── locales/
+│   │       ├── th.ts             # Thai strings (source of truth for Translations type)
+│   │       └── en.ts             # English strings (typed against Translations)
 │   ├── Dockerfile
 │   └── next.config.ts
 │
@@ -558,6 +562,18 @@ The FAB opens a **picker** with two options:
 
 State: `panelMode: null | "picker" | "upload" | "manual"` in `page.tsx`. FAB rotates to × when any panel is open.
 
+## Frontend: language switching
+
+Language is stored in `localStorage` under key `"locale"` (`"th"` or `"en"`). `I18nProvider` reads it on mount and keeps `<html lang>` in sync.
+
+- `useI18n()` returns `{ t, locale, setLocale }` — call in any client component
+- `toBCP47(locale)` maps `"th"` → `"th-TH"`, `"en"` → `"en-US"` for `Intl` APIs
+- `EN` / `ไทย` toggle button lives in the yellow header in `page.tsx`
+- All user-visible strings live in `lib/locales/th.ts` (source of truth) and `lib/locales/en.ts`
+- `CATEGORIES` in `types.ts` is a `readonly Category[]` array of keys — never import labels from it, use `t.categories[key]`
+- Date formatting (month label, day headers) and number formatting (totals, donut) use `toBCP47(locale)` passed to `Intl` APIs
+- `STEPS` in `ScanStatus.tsx` is defined inside the component so step labels react to locale changes
+
 ## Frontend: upload flow
 
 ```
@@ -565,13 +581,11 @@ State: `panelMode: null | "picker" | "upload" | "manual"` in `page.tsx`. FAB rot
 2. For each file: POST /upload/presign → { upload_url, key, job_id }
 3. PUT file bytes to upload_url  (raw bytes, not FormData)
 4. Start polling GET /scan/{job_id} every 2 seconds per file
-5. Show Thai status label per response status:
-     pending    → "รอการอัปโหลด..."
-     uploaded   → "อัปโหลดสำเร็จ กำลังเตรียม..."
-     resizing   → "กำลังปรับขนาดรูปภาพ..."
-     processing → "กำลังประมวลผล..."
-     done       → "เสร็จสิ้น"
-     failed     → show data.error verbatim (e.g. "ไม่พบสลิปธนาคารในภาพนี้")
+5. Show status label per response status (text comes from active locale via `t.uploader.*`):
+     uploading  → t.uploader.uploading
+     scanning   → t.uploader.analyzing
+     done       → t.uploader.done
+     failed     → entry.error ?? t.uploader.error
 6. On "done"   → show result, prompt for category + note → PATCH /expenses/{id}
 7. On "failed" → show error message, allow retry
 ```

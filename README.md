@@ -17,6 +17,7 @@ Scan Thai bank transfer slips and automatically extract amount, date, time, cate
 - Navigate between months with the month selector
 - Sort expenses by slip date or upload date — preference persisted across sessions
 - Skeleton loading states for header totals, category summary, and expense list
+- Switch between Thai and English — language preference persisted across sessions
 
 ## Stack
 
@@ -205,7 +206,11 @@ Dates in Buddhist Era (e.g. พ.ศ. 2568) are automatically converted to CE.
 │   │   └── DonutChart.tsx         # Pure SVG donut (no chart library)
 │   └── lib/
 │       ├── api.ts                 # All fetch calls to both backends
-│       └── types.ts               # Shared TypeScript interfaces
+│       ├── types.ts               # Shared TypeScript interfaces
+│       ├── i18n.tsx               # I18nProvider, useI18n hook
+│       └── locales/
+│           ├── th.ts              # Thai strings
+│           └── en.ts              # English strings
 ├── backend/
 │   ├── sync/
 │   │   ├── slip/                  # slip-api  (port 8000)
@@ -247,6 +252,7 @@ Dates in Buddhist Era (e.g. พ.ศ. 2568) are automatically converted to CE.
 - **Non-slip detection in the prompt.** Claude is instructed to return `{"not_a_slip": true}` when the image is not a bank transfer slip. The worker detects this sentinel and stores a Thai-language error message (`ไม่พบสลิปธนาคารในภาพนี้`) rather than a raw exception string.
 - **Month filtering, sort, and category aggregation in SQL.** `GET /expenses` returns `{ expenses, summary }` in one query. The frontend never re-aggregates — it renders `summary` as-is.
 - **Manual entries coexist with slip-backed entries.** `expenses.image_id` is nullable. `GET /expenses` uses `LEFT JOIN images` so both types appear. `DELETE` checks `image_id` first — if set it cascades via the image row; if null it deletes the expense row directly.
+- **Zero-dependency i18n.** All UI strings live in `lib/locales/th.ts` and `lib/locales/en.ts`. A React Context (`useI18n`) serves the active locale; `localStorage` persists the preference. No i18n library needed.
 
 ## License
 
