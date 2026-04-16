@@ -7,6 +7,7 @@ import SlipUploader from "@/components/SlipUploader";
 import ManualEntryForm from "@/components/ManualEntryForm";
 import ExpenseList from "@/components/ExpenseList";
 import MonthlySummary from "@/components/MonthlySummary";
+import { useI18n, toBCP47 } from "@/lib/i18n";
 
 function monthKey(offset: number): string {
   const d = new Date();
@@ -15,15 +16,18 @@ function monthKey(offset: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function monthLabel(key: string): string {
+function monthLabel(key: string, bcp47: string): string {
   const [y, m] = key.split("-").map(Number);
-  return new Date(y, m - 1).toLocaleDateString("th-TH", {
+  return new Date(y, m - 1).toLocaleDateString(bcp47, {
     year: "numeric",
     month: "long",
   });
 }
 
 export default function Home() {
+  const { t, locale, setLocale } = useI18n();
+  const bcp47 = toBCP47(locale);
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [summary, setSummary] = useState<CategorySummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +71,7 @@ export default function Home() {
   const filtered = expenses;
   const total = summary.reduce((s, c) => s + c.total, 0);
 
-  const totalFormatted = new Intl.NumberFormat("th-TH", {
+  const totalFormatted = new Intl.NumberFormat(bcp47, {
     style: "currency",
     currency: "THB",
     minimumFractionDigits: 2,
@@ -82,8 +86,17 @@ export default function Home() {
         <div className="flex items-center justify-between mb-6">
           <span className="font-black text-page text-lg tracking-tight">🐶 WoofJot</span>
 
-          {/* Month navigation */}
           <div className="flex items-center gap-2">
+            {/* Language toggle */}
+            <button
+              onClick={() => setLocale(locale === "th" ? "en" : "th")}
+              className="text-xs font-bold text-page/60 hover:text-page transition-colors px-1"
+              aria-label="Toggle language"
+            >
+              {locale === "th" ? "EN" : "ไทย"}
+            </button>
+
+            {/* Month navigation */}
             <button
               onClick={() => setOffset(o => o - 1)}
               className="w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 flex items-center justify-center font-bold text-page text-lg leading-none transition-colors"
@@ -91,7 +104,7 @@ export default function Home() {
               ‹
             </button>
             <span className="text-sm font-semibold text-page w-32 text-center">
-              {monthLabel(key)}
+              {monthLabel(key, bcp47)}
             </span>
             <button
               onClick={() => setOffset(o => Math.min(0, o + 1))}
@@ -105,7 +118,7 @@ export default function Home() {
 
         {/* Total */}
         <p className="text-page/50 text-xs font-semibold uppercase tracking-widest">
-          รายจ่ายทั้งหมด
+          {t.page.totalExpenses}
         </p>
         {loading ? (
           <div className="animate-pulse mt-1 space-y-2">
@@ -118,7 +131,7 @@ export default function Home() {
               {totalFormatted}
             </p>
             <p className="text-page/50 text-sm mt-2 font-medium">
-              {filtered.length} รายการ
+              {filtered.length} {t.page.items}
             </p>
           </>
         )}
@@ -139,7 +152,7 @@ export default function Home() {
                   : "text-muted"
               }`}
             >
-              {s === "date" ? "วันที่สลิป" : "วันที่อัปโหลด"}
+              {s === "date" ? t.page.sortBySlipDate : t.page.sortByUploadDate}
             </button>
           ))}
         </div>
@@ -153,14 +166,14 @@ export default function Home() {
               className="flex-1 bg-surface border border-elevated rounded-2xl py-3 text-sm font-semibold text-white flex flex-col items-center gap-1 transition-colors hover:bg-elevated"
             >
               <span className="text-xl">📷</span>
-              <span>อัปโหลดสลิป</span>
+              <span>{t.page.uploadSlip}</span>
             </button>
             <button
               onClick={() => setPanelMode("manual")}
               className="flex-1 bg-surface border border-elevated rounded-2xl py-3 text-sm font-semibold text-white flex flex-col items-center gap-1 transition-colors hover:bg-elevated"
             >
               <span className="text-xl">✏️</span>
-              <span>บันทึกเอง</span>
+              <span>{t.page.manualEntry}</span>
             </button>
           </div>
         )}
@@ -211,7 +224,7 @@ export default function Home() {
                 <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
               </svg>
             </div>
-            <span className="text-[10px] font-semibold text-accent">หน้าแรก</span>
+            <span className="text-[10px] font-semibold text-accent">{t.nav.home}</span>
           </div>
 
           {/* FAB */}
@@ -225,7 +238,7 @@ export default function Home() {
                 : "bg-accent text-page ring-4 ring-accent/20"
               }
             `}
-            aria-label="เพิ่มรายการ"
+            aria-label={t.nav.addItem}
           >
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
               <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
@@ -239,7 +252,7 @@ export default function Home() {
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
               </svg>
             </div>
-            <span className="text-[10px] font-semibold text-muted">อื่นๆ</span>
+            <span className="text-[10px] font-semibold text-muted">{t.nav.other}</span>
           </div>
         </div>
       </nav>

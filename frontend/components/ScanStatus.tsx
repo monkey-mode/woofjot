@@ -3,13 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getScanStatus } from "@/lib/api";
 import type { ScanResult, ScanStatus as Status } from "@/lib/types";
-
-const STEPS: { status: Status; label: string }[] = [
-  { status: "uploaded",   label: "อัปโหลดสำเร็จ" },
-  { status: "resizing",   label: "ปรับขนาดรูป" },
-  { status: "processing", label: "วิเคราะห์สลิป" },
-  { status: "done",       label: "เสร็จสิ้น" },
-];
+import { useI18n } from "@/lib/i18n";
 
 const STATUS_ORDER: Record<Status, number> = {
   pending:    0,
@@ -27,9 +21,17 @@ interface Props {
 }
 
 export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
+  const { t } = useI18n();
   const [status, setStatus] = useState<Status>("pending");
   const [error, setError] = useState<string | null>(null);
   const attempts = useRef(0);
+
+  const STEPS: { status: Status; label: string }[] = [
+    { status: "uploaded",   label: t.scanStatus.stepUploaded },
+    { status: "resizing",   label: t.scanStatus.stepResizing },
+    { status: "processing", label: t.scanStatus.stepProcessing },
+    { status: "done",       label: t.scanStatus.stepDone },
+  ];
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -37,7 +39,7 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
       if (attempts.current > 30) {
         clearInterval(interval);
         setStatus("failed");
-        setError("หมดเวลา กรุณาลองใหม่");
+        setError(t.scanStatus.timeout);
         return;
       }
       try {
@@ -48,26 +50,26 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
           onDone(data.result);
         } else if (data.status === "failed") {
           clearInterval(interval);
-          setError(data.error ?? "เกิดข้อผิดพลาด");
+          setError(data.error ?? t.scanStatus.error);
         }
       } catch { /* keep polling */ }
     }, 2000);
     return () => clearInterval(interval);
-  }, [jobId, onDone]);
+  }, [jobId, onDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (status === "failed") {
     return (
       <div className="bg-[#1E0A0A] border border-red-900/40 rounded-2xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <span className="w-6 h-6 rounded-full bg-red-900/50 flex items-center justify-center text-red-400 text-xs font-bold">✕</span>
-          <p className="text-red-400 font-semibold text-sm">เกิดข้อผิดพลาด</p>
+          <p className="text-red-400 font-semibold text-sm">{t.scanStatus.error}</p>
         </div>
         {error && <p className="text-red-500/70 text-xs pl-8">{error}</p>}
         <button
           onClick={onFailed}
           className="ml-8 text-xs text-accent font-semibold underline underline-offset-2"
         >
-          ลองใหม่
+          {t.scanStatus.retry}
         </button>
       </div>
     );
@@ -80,7 +82,7 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-5 h-5 border-2 border-lift border-t-accent rounded-full animate-spin shrink-0" />
-        <p className="text-white font-semibold text-sm">กำลังประมวลผลสลิป...</p>
+        <p className="text-white font-semibold text-sm">{t.scanStatus.header}</p>
       </div>
 
       {/* Steps */}
@@ -115,11 +117,11 @@ export default function ScanStatus({ jobId, onDone, onFailed }: Props) {
 
               {active && (
                 <span className="text-[10px] text-accent/60 animate-pulse font-medium">
-                  กำลังดำเนินการ
+                  {t.scanStatus.inProgress}
                 </span>
               )}
               {done && (
-                <span className="text-[10px] text-muted">เสร็จ</span>
+                <span className="text-[10px] text-muted">{t.scanStatus.doneStatus}</span>
               )}
             </div>
           );

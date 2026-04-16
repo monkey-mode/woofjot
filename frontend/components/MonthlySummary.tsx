@@ -3,6 +3,8 @@
 import type { CategorySummary } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 import DonutChart, { type DonutSegment } from "./DonutChart";
+import { useI18n, toBCP47 } from "@/lib/i18n";
+import type { Category } from "@/lib/types";
 
 interface Props {
   summary: CategorySummary[];
@@ -32,6 +34,9 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 export default function MonthlySummary({ summary, loading }: Props) {
+  const { t, locale } = useI18n();
+  const bcp47 = toBCP47(locale);
+
   if (loading) {
     return (
       <div className="flex gap-4 items-center animate-pulse">
@@ -63,14 +68,14 @@ export default function MonthlySummary({ summary, loading }: Props) {
       <div className="relative w-28 h-28 shrink-0">
         <DonutChart segments={segments} />
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-accent text-[10px] font-semibold uppercase tracking-wide">รายจ่าย</p>
+          <p className="text-accent text-[10px] font-semibold uppercase tracking-wide">{t.summary.expenses}</p>
           <p className="text-white font-black text-sm leading-tight">
-            {new Intl.NumberFormat("th-TH", {
+            {new Intl.NumberFormat(bcp47, {
               notation: "compact",
               maximumFractionDigits: 1,
             }).format(total)}
           </p>
-          <p className="text-muted text-[10px]">บาท</p>
+          <p className="text-muted text-[10px]">{t.summary.baht}</p>
         </div>
       </div>
 
@@ -84,11 +89,13 @@ export default function MonthlySummary({ summary, loading }: Props) {
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="text-sm">{CATEGORY_ICONS[category] ?? "📋"}</span>
                   <span className="text-faint text-xs truncate">
-                    {CATEGORIES[category as keyof typeof CATEGORIES] ?? category}
+                    {(CATEGORIES as readonly string[]).includes(category)
+                      ? t.categories[category as Category]
+                      : category}
                   </span>
                 </div>
                 <span className="text-white text-xs font-semibold ml-2 shrink-0">
-                  {new Intl.NumberFormat("th-TH", {
+                  {new Intl.NumberFormat(bcp47, {
                     maximumFractionDigits: 0,
                   }).format(amount)}
                 </span>

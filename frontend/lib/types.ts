@@ -80,13 +80,13 @@ export type Category =
   | "invest"
   | "other";
 
-export const CATEGORIES: Record<Category, string> = {
-  food: "อาหาร",
-  transport: "เดินทาง",
-  shopping: "ช้อปปิ้ง",
-  utilities: "ค่าน้ำค่าไฟ",
-  health: "สุขภาพ",
-  entertainment: "บันเทิง",
-  invest: "ลงทุน",
-  other: "อื่นๆ",
-};
+export const CATEGORIES: readonly Category[] = [
+  "food",
+  "transport",
+  "shopping",
+  "utilities",
+  "health",
+  "entertainment",
+  "invest",
+  "other",
+];

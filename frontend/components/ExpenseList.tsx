@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { deleteExpense, updateExpense } from "@/lib/api";
-import type { Expense } from "@/lib/types";
+import type { Category, Expense } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
+import { useI18n, toBCP47 } from "@/lib/i18n";
 
 interface Props {
   expenses: Expense[];
@@ -11,9 +12,9 @@ interface Props {
   sort?: "date" | "uploaded";
 }
 
-function formatAmount(amount: number | null) {
+function formatAmount(amount: number | null, bcp47: string) {
   if (amount == null) return "—";
-  return new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2 }).format(amount);
+  return new Intl.NumberFormat(bcp47, { minimumFractionDigits: 2 }).format(amount);
 }
 
 function groupByDay(expenses: Expense[], sort: "date" | "uploaded"): Record<string, Expense[]> {
@@ -21,26 +22,27 @@ function groupByDay(expenses: Expense[], sort: "date" | "uploaded"): Record<stri
   for (const e of expenses) {
     const key = sort === "uploaded"
       ? e.created_at.slice(0, 10)
-      : (e.date ?? "ไม่ทราบวันที่");
+      : (e.date ?? "unknown");
     (groups[key] ??= []).push(e);
   }
   return groups;
 }
 
-function dayLabel(key: string): string {
+function dayLabel(key: string, bcp47: string, unknownDate: string): string {
+  if (key === "unknown") return unknownDate;
   if (!key.match(/^\d{4}-\d{2}-\d{2}$/)) return key;
   const [y, m, d] = key.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("th-TH", {
+  return new Date(y, m - 1, d).toLocaleDateString(bcp47, {
     weekday: "short", day: "numeric", month: "short",
   });
 }
 
-function formatDateTime(date: string | null, time: string | null): string {
+function formatDateTime(date: string | null, time: string | null, bcp47: string, timeSuffix: string): string {
   const datePart = date
     ? new Date(...(date.split("-").map(Number) as [number, number, number]))
-        .toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" })
+        .toLocaleDateString(bcp47, { day: "numeric", month: "short", year: "2-digit" })
     : null;
-  const timePart = time ? time.slice(0, 5) + " น." : null;
+  const timePart = time ? time.slice(0, 5) + timeSuffix : null;
   return [datePart, timePart].filter(Boolean).join("  ");
 }
 
@@ -74,6 +76,9 @@ interface RowProps {
 }
 
 function ExpenseRow({ expense, onRefresh }: RowProps) {
+  const { t, locale } = useI18n();
+  const bcp47 = toBCP47(locale);
+
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [lightbox, setLightbox] = useState(false);
@@ -110,7 +115,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
   }
 
   async function remove() {
-    if (!confirm("ลบรายการนี้?")) return;
+    if (!confirm(t.expenseList.confirmDelete)) return;
     await deleteExpense(expense.id);
     onRefresh();
   }
@@ -122,7 +127,6 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
 
   return (
     <>
-
       <div className="bg-surface rounded-2xl overflow-hidden border border-elevated">
 
         {/* ── Collapsed row (always visible, tap to expand) ── */}
@@ -141,7 +145,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
           {/* Info */}
           <div className="flex-1 min-w-0">
             <p className={`font-semibold text-sm truncate ${cat ? "text-white" : "text-muted"}`}>
-              {cat ? (CATEGORIES[cat as keyof typeof CATEGORIES] ?? cat) : "ยังไม่ระบุหมวดหมู่"}
+              {cat ? (t.categories[cat as Category] ?? cat) : t.expenseList.noCategory}
             </p>
             {expense.note && (
               <p className="text-muted text-xs truncate mt-0.5">{expense.note}</p>
@@ -155,7 +159,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
           <div className="text-right shrink-0 flex items-center gap-2">
             <div>
               <p className="font-bold text-white text-base">
-                {formatAmount(expense.amount)}{" "}
+                {formatAmount(expense.amount, bcp47)}{" "}
                 <span className="text-muted text-xs font-normal">฿</span>
               </p>
               <p className="text-line text-[10px] text-right">
@@ -185,7 +189,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
             {!editing && (
               <div className="space-y-3">
                 <p className="text-muted text-[10px] font-semibold uppercase tracking-widest">
-                  ข้อมูลจากสลิป
+                  {t.expenseList.slipInfo}
                 </p>
 
                 {/* Sender / Receiver + thumbnail side-by-side */}
@@ -200,7 +204,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                           </svg>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-muted text-[10px]">จาก</p>
+                          <p className="text-muted text-[10px]">{t.expenseList.from}</p>
                           <p className="text-white text-sm font-medium truncate">{expense.sender}</p>
                         </div>
                       </div>
@@ -215,7 +219,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                           </svg>
                         </div>
                         <div className="min-w-0">
-                          <p className="text-muted text-[10px]">ถึง</p>
+                          <p className="text-muted text-[10px]">{t.expenseList.to}</p>
                           <p className="text-white text-sm font-medium truncate">{expense.receiver}</p>
                         </div>
                       </div>
@@ -235,14 +239,14 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <span className="text-accent text-[10px] font-medium">แตะเพื่อดูสลิป</span>
+                      <span className="text-accent text-[10px] font-medium">{t.expenseList.tapToViewSlip}</span>
                     </button>
                   ) : (
                     <div className="shrink-0 flex flex-col items-center gap-1 self-start">
                       <div className="w-20 h-20 rounded-xl border border-line bg-elevated flex items-center justify-center">
                         <span className="text-3xl">✏️</span>
                       </div>
-                      <span className="text-muted text-[10px]">บันทึกเอง</span>
+                      <span className="text-muted text-[10px]">{t.expenseList.manualEntryLabel}</span>
                     </div>
                   )}
                 </div>
@@ -266,7 +270,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
 
                 {/* Date/time */}
                 <p className="text-muted text-xs">
-                  {formatDateTime(expense.date, expense.time)}
+                  {formatDateTime(expense.date, expense.time, bcp47, t.expenseList.timeSuffix)}
                 </p>
               </div>
             )}
@@ -275,11 +279,11 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
             {editing && (
               <div className="space-y-2">
                 <p className="text-muted text-[10px] font-semibold uppercase tracking-widest">
-                  แก้ไขข้อมูล
+                  {t.expenseList.editInfo}
                 </p>
                 <div className="flex gap-2">
                   <input value={amount} onChange={e => setAmount(e.target.value)}
-                    placeholder="จำนวนเงิน" type="number" inputMode="decimal"
+                    placeholder={t.expenseList.amount} type="number" inputMode="decimal"
                     className={INPUT_CLS + " flex-1"} />
                   <input value={date} onChange={e => setDate(e.target.value)}
                     type="date" className={INPUT_CLS + " flex-1"} />
@@ -288,27 +292,27 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                   type="time" className={INPUT_CLS} />
                 <div className="flex gap-2">
                   <input value={sender} onChange={e => setSender(e.target.value)}
-                    placeholder="จาก (ผู้โอน)" className={INPUT_CLS + " flex-1"} />
+                    placeholder={t.expenseList.sender} className={INPUT_CLS + " flex-1"} />
                   <input value={receiver} onChange={e => setReceiver(e.target.value)}
-                    placeholder="ถึง (ผู้รับ)" className={INPUT_CLS + " flex-1"} />
+                    placeholder={t.expenseList.receiver} className={INPUT_CLS + " flex-1"} />
                 </div>
                 <select value={category} onChange={e => setCategory(e.target.value)}
                   className={INPUT_CLS}>
-                  <option value="">เลือกหมวดหมู่</option>
-                  {Object.entries(CATEGORIES).map(([k, v]) => (
-                    <option key={k} value={k}>{CATEGORY_ICONS[k]} {v}</option>
+                  <option value="">{t.expenseList.selectCategory}</option>
+                  {CATEGORIES.map(k => (
+                    <option key={k} value={k}>{CATEGORY_ICONS[k]} {t.categories[k]}</option>
                   ))}
                 </select>
                 <input value={note} onChange={e => setNote(e.target.value)}
-                  placeholder="บันทึกย่อ..." className={INPUT_CLS} />
+                  placeholder={t.expenseList.note} className={INPUT_CLS} />
                 <div className="flex gap-2 pt-1">
                   <button onClick={save} disabled={saving}
                     className="flex-1 bg-accent text-page text-sm py-2 rounded-xl font-bold hover:bg-[#E6B800] disabled:opacity-50 transition-colors">
-                    บันทึก
+                    {t.expenseList.save}
                   </button>
                   <button onClick={() => setEditing(false)}
                     className="text-sm text-muted hover:text-white px-4 transition-colors">
-                    ยกเลิก
+                    {t.expenseList.cancel}
                   </button>
                 </div>
               </div>
@@ -324,7 +328,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
                     <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                   </svg>
-                  แก้ไขข้อมูล
+                  {t.expenseList.editButton}
                 </button>
                 <button
                   onClick={remove}
@@ -333,7 +337,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                   <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
                     <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                   </svg>
-                  ลบรายการนี้
+                  {t.expenseList.deleteButton}
                 </button>
               </div>
             )}
@@ -344,7 +348,7 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
                 onClick={handleCollapse}
                 className="w-full text-center text-line text-[10px] hover:text-muted transition-colors pt-1"
               >
-                ▲ ย่อ
+                {t.expenseList.collapse}
               </button>
             )}
           </div>
@@ -355,12 +359,15 @@ function ExpenseRow({ expense, onRefresh }: RowProps) {
 }
 
 export default function ExpenseList({ expenses, onRefresh, sort = "date" }: Props) {
+  const { t, locale } = useI18n();
+  const bcp47 = toBCP47(locale);
+
   if (expenses.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="text-5xl mb-4">🐶</div>
-        <p className="text-muted font-semibold">ยังไม่มีรายการ</p>
-        <p className="text-line text-sm mt-1">กดปุ่ม + เพื่อเพิ่มรายการ</p>
+        <p className="text-muted font-semibold">{t.expenseList.empty}</p>
+        <p className="text-line text-sm mt-1">{t.expenseList.emptyHint}</p>
       </div>
     );
   }
@@ -375,10 +382,10 @@ export default function ExpenseList({ expenses, onRefresh, sort = "date" }: Prop
           <div key={day}>
             <div className="flex items-center justify-between px-1 mb-2">
               <p className="text-muted text-xs font-semibold uppercase tracking-wider">
-                {dayLabel(day)}
+                {dayLabel(day, bcp47, t.expenseList.unknownDate)}
               </p>
               <p className="text-muted text-xs font-semibold">
-                {new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 }).format(dayTotal)} ฿
+                {new Intl.NumberFormat(bcp47, { maximumFractionDigits: 0 }).format(dayTotal)} ฿
               </p>
             </div>
             <div className="space-y-2">
