@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { presign, uploadToMinIO, getScanStatus } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 const MAX_FILES = 10;
 
@@ -28,6 +29,7 @@ interface JobRowProps {
 }
 
 function JobRow({ entry, onDone, onFailed }: JobRowProps) {
+  const { t } = useI18n();
   const attempts = useRef(0);
   const { jobId, phase } = entry;
 
@@ -38,7 +40,7 @@ function JobRow({ entry, onDone, onFailed }: JobRowProps) {
       attempts.current += 1;
       if (attempts.current > 30) {
         clearInterval(interval);
-        onFailed("หมดเวลา กรุณาลองใหม่");
+        onFailed(t.uploader.timeout);
         return;
       }
       try {
@@ -48,7 +50,7 @@ function JobRow({ entry, onDone, onFailed }: JobRowProps) {
           onDone();
         } else if (data.status === "failed") {
           clearInterval(interval);
-          onFailed(data.error ?? "เกิดข้อผิดพลาด");
+          onFailed(data.error ?? t.uploader.error);
         }
       } catch { /* keep polling */ }
     }, 2000);
@@ -67,10 +69,10 @@ function JobRow({ entry, onDone, onFailed }: JobRowProps) {
   }[phase];
 
   const statusText = {
-    uploading: "กำลังอัปโหลด...",
-    scanning:  "กำลังวิเคราะห์...",
-    done:      "เสร็จสิ้น",
-    failed:    entry.error ?? "เกิดข้อผิดพลาด",
+    uploading: t.uploader.uploading,
+    scanning:  t.uploader.analyzing,
+    done:      t.uploader.done,
+    failed:    entry.error ?? t.uploader.error,
   }[phase];
 
   const statusColor = {
@@ -92,6 +94,7 @@ function JobRow({ entry, onDone, onFailed }: JobRowProps) {
 // ── Main uploader ────────────────────────────────────────────────────────────
 
 export default function SlipUploader({ onDone, onCancel }: Props) {
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const [jobs, setJobs] = useState<JobEntry[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -120,7 +123,7 @@ export default function SlipUploader({ onDone, onCancel }: Props) {
         } catch (e) {
           updateJob(idx, {
             phase: "failed",
-            error: e instanceof Error ? e.message : "อัปโหลดไม่สำเร็จ",
+            error: e instanceof Error ? e.message : t.uploader.uploadFailed,
           });
         }
       })
@@ -160,15 +163,15 @@ export default function SlipUploader({ onDone, onCancel }: Props) {
               className="flex-1 bg-accent text-page text-sm py-2 rounded-xl font-bold transition-colors"
             >
               {failCount > 0
-                ? `ปิด (สำเร็จ ${doneCount} / ล้มเหลว ${failCount})`
-                : `เสร็จสิ้น ${doneCount} รายการ`
+                ? `${t.uploader.closeSuccess} (${t.uploader.doneLabel} ${doneCount} / ${t.uploader.failedLabel} ${failCount})`
+                : `${t.uploader.doneLabel} ${doneCount} ${t.uploader.items}`
               }
             </button>
             <button
               onClick={() => setJobs([])}
               className="text-sm text-muted hover:text-white px-4 transition-colors"
             >
-              อัปโหลดเพิ่ม
+              {t.uploader.uploadMore}
             </button>
           </div>
         ) : onCancel && (
@@ -176,7 +179,7 @@ export default function SlipUploader({ onDone, onCancel }: Props) {
             onClick={onCancel}
             className="w-full text-center text-sm text-muted hover:text-white py-1 transition-colors"
           >
-            ยกเลิก
+            {t.uploader.cancel}
           </button>
         )}
       </div>
@@ -210,9 +213,9 @@ export default function SlipUploader({ onDone, onCancel }: Props) {
           📄
         </div>
         <div className="text-center">
-          <p className="text-white font-bold">อัปโหลดสลิป</p>
-          <p className="text-muted text-sm mt-0.5">วางไฟล์ที่นี่ หรือแตะเพื่อเลือก</p>
-          <p className="text-line text-xs mt-1">สูงสุด {MAX_FILES} ไฟล์ · JPG · PNG · WEBP</p>
+          <p className="text-white font-bold">{t.uploader.header}</p>
+          <p className="text-muted text-sm mt-0.5">{t.uploader.dropHint}</p>
+          <p className="text-line text-xs mt-1">{t.uploader.maxFiles} {MAX_FILES} {t.uploader.fileTypes}</p>
         </div>
       </button>
 
@@ -221,7 +224,7 @@ export default function SlipUploader({ onDone, onCancel }: Props) {
           onClick={onCancel}
           className="w-full text-center text-sm text-muted hover:text-white py-1 transition-colors"
         >
-          ยกเลิก
+          {t.uploader.cancel}
         </button>
       )}
     </div>
